@@ -1,0 +1,146 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+  Dark, zinc-based theme with an orange accent. Colors in OKLCH (Tailwind v4 CSS-first).
+  The app is dark-only; :root carries the dark palette directly. Tokens approximate the
+  spec's intended values (background ~6% L, foreground ~88% L, accent orange).
+*/
+:root {
+  --radius: 0.625rem;
+
+  /* Warm, deep ground. A faint warm hue (~70) instead of cool blue keeps it from reading
+     like a default Tailwind zinc theme; layers separate by lightness, not by saturation. */
+  --background: oklch(0.165 0.006 70);
+  --foreground: oklch(0.94 0.004 70);
+
+  --card: oklch(0.205 0.006 70);
+  --card-foreground: oklch(0.94 0.004 70);
+
+  --popover: oklch(0.225 0.007 70);
+  --popover-foreground: oklch(0.94 0.004 70);
+
+  /* primary = warm terracotta accent, slightly muted vs. neon orange so it reads intentional */
+  --primary: oklch(0.7 0.155 48);
+  --primary-foreground: oklch(0.17 0.03 48);
+
+  --secondary: oklch(0.26 0.006 70);
+  --secondary-foreground: oklch(0.94 0.004 70);
+
+  --muted: oklch(0.255 0.006 70);
+  --muted-foreground: oklch(0.7 0.01 70);
+
+  /* accent mirrors the primary so border-accent / text-accent read as the brand */
+  --accent: oklch(0.7 0.155 48);
+  --accent-foreground: oklch(0.17 0.03 48);
+
+  --destructive: oklch(0.64 0.2 25);
+  --destructive-foreground: oklch(0.99 0 0);
+
+  --success: oklch(0.72 0.15 155);
+  --success-foreground: oklch(0.16 0.03 155);
+
+  --border: oklch(0.3 0.006 70);
+  --input: oklch(0.3 0.006 70);
+  --ring: oklch(0.7 0.155 48);
+
+  /* Per-domain palette (Principle V, v1.1.0). Muted, sophisticated hues — used as RESTRAINED
+     accents (dot / thin rule / badge), never large saturated fills. Lower chroma than before so
+     the set reads as a considered palette, not a candy rainbow. Near-black fg clears WCAG AA. */
+  --d1: oklch(0.66 0.13 286); /* D1 Agentic — violet */
+  --d2: oklch(0.69 0.1 232); /* D2 Tools/MCP — slate-azure */
+  --d3: oklch(0.72 0.11 168); /* D3 Claude Code — teal */
+  --d4: oklch(0.76 0.12 72); /* D4 Prompting — wheat */
+  --d5: oklch(0.69 0.12 8); /* D5 Context — clay-rose */
+  --d-foreground: oklch(0.17 0.02 70);
+
+  /* Tokenized soft elevation scale (no inline shadows anywhere in the UI). Crisper, tighter
+     shadows for depth without the bloomy "AI" glow. */
+  --shadow-card: 0 1px 2px oklch(0 0 0 / 0.3), 0 1px 1px oklch(0 0 0 / 0.2);
+  --shadow-raised: 0 4px 14px oklch(0 0 0 / 0.4), 0 1px 3px oklch(0 0 0 / 0.28);
+  --shadow-pop: 0 14px 36px oklch(0 0 0 / 0.5), 0 4px 12px oklch(0 0 0 / 0.34);
+  --shadow-accent: 0 6px 22px oklch(0.7 0.155 48 / 0.26);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  /* Per-domain utilities: bg-d1, text-d1, border-d1, ring-d1, … */
+  --color-d1: var(--d1);
+  --color-d2: var(--d2);
+  --color-d3: var(--d3);
+  --color-d4: var(--d4);
+  --color-d5: var(--d5);
+  --color-d-foreground: var(--d-foreground);
+
+  /* Elevation utilities: shadow-card, shadow-raised, shadow-pop, shadow-accent. */
+  --shadow-card: var(--shadow-card);
+  --shadow-raised: var(--shadow-raised);
+  --shadow-pop: var(--shadow-pop);
+  --shadow-accent: var(--shadow-accent);
+
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  /* Editorial type pairing: Fraunces (serif display, optical sizing) for big display
+     moments; Inter stays the readable UI/body face. Utilities: font-display / font-sans. */
+  --font-display: 'Fraunces', ui-serif, Georgia, serif;
+  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+
+  /* Editorial type scale. Two intermediate steps the default Tailwind ramp lacks:
+     text-eyebrow (11px small-caps section labels) and text-15 (comfortable 15px subhead/body). */
+  --text-eyebrow: 0.6875rem;
+  --text-eyebrow--line-height: 1rem;
+  --text-15: 0.9375rem;
+  --text-15--line-height: 1.5rem;
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+    outline-color: color-mix(in oklch, var(--ring) 50%, transparent);
+  }
+  html {
+    color-scheme: dark;
+  }
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+    font-size: 16px;
+    line-height: 1.6;
+    font-weight: 400;
+    letter-spacing: -0.006em;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  /* Fraunces carries optical sizing; opt it in wherever font-display is used. */
+  .font-display {
+    font-optical-sizing: auto;
+    font-feature-settings: 'ss01';
+  }
+}
