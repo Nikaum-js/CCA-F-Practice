@@ -1,0 +1,922 @@
+{
+ "016dae4da0": {
+  "explanation": "Em um sistema multiagente, falhas ou lentidões de trabalhadores individuais não devem bloquear toda a orquestração. Definir timeouts por trabalhador, prosseguir com os resultados disponíveis e sinalizar de forma transparente a cobertura incompleta permite que o sistema entregue valor enquanto comunica honestamente suas limitações. Esperar indefinidamente (A) cria um risco de latência ilimitada — um único trabalhador travado bloqueia todo o relatório. O reinício completo (C) desperdiça todo o trabalho concluído e pode reproduzir o mesmo timeout. Promover seletivamente um trabalhador a \"bloqueante\" (D) é improvisado e não resolve o problema fundamental do timeout. Resultados parciais com sinalizações transparentes de cobertura são quase sempre mais úteis do que nenhum resultado. --- <a name=\"scenario-3\"></a> ## Cenário 3: Geração de Código com o Claude Code **Contexto:** Você está construindo um assistente para desenvolvedores baseado no Claude que ajuda com refatoração em larga escala, geração de código em projetos existentes complexos e sessões prolongadas de codificação conversacional. Os principais desafios incluem gerenciar contexto persistente entre sessões (análogo ao `CLAUDE.md`), lidar com desvios comportamentais em conversas longas, preservar restrições técnicas críticas durante a compressão de contexto e construir interações stateful de múltiplos turnos sobre uma API stateless. ---",
+  "options": {
+   "A": "Sempre esperar que todos os trabalhadores concluam antes de prosseguir, independentemente do tempo decorrido, para garantir que o relatório tenha cobertura completa das fontes.",
+   "B": "Definir um timeout por trabalhador; se um trabalhador exceder esse limite, marcar aquela fonte como indisponível no relatório e prosseguir com os resultados dos trabalhadores concluídos, sinalizando explicitamente a cobertura incompleta.",
+   "C": "Cancelar todos os trabalhadores pendentes e reiniciar todo o despacho paralelo com um novo conjunto de agentes trabalhadores.",
+   "D": "Promover um dos trabalhadores lentos a uma dependência \"bloqueante\" e aplicar timeouts apenas ao trabalhador pendente restante."
+  },
+  "text": "Seu orquestrador de pesquisa despacha cinco agentes trabalhadores em paralelo para recuperar dados de fontes diferentes. Três trabalhadores retornam com sucesso em até 8 segundos, mas dois ainda estão pendentes na marca de 30 segundos, sem resposta. O orquestrador precisa decidir se espera ou prossegue. Qual estratégia melhor equilibra a completude dos resultados com a confiabilidade do sistema?"
+ },
+ "04220637d9": {
+  "explanation": "Por que está correto: Os agentes raciocinam melhor sobre estruturas de dados consistentes e previsíveis. Despejar schemas heterogêneos e específicos de cada transportadora no contexto força o LLM a gastar atenção interpretando formatos em vez de resolver o problema central do usuário (por exemplo, determinar o status de entrega). Normalizar a saída no seu middleware abstrai as peculiaridades dos fornecedores. Por que as outras são mais fracas: - **A)** Empurra a lógica de interpretação para o prompt, tornando o raciocínio frágil. - **C)** Incha o conjunto de ferramentas desnecessariamente. - **D)** Adicionar a saída bruta só adiciona ruído e consome espaço na janela de contexto quando o agente só precisa dos campos centrais. ** Lição do Exame:** Normalize respostas heterogêneas de API em um schema comum consistente *antes* de retorná-las ao agente, para reduzir a carga cognitiva e melhorar o raciocínio. ---",
+  "options": {
+   "A": "Passar o JSON bruto ao agente e fornecer instruções extensas no prompt sobre como interpretar o formato de cada transportadora.",
+   "B": "Normalizar as respostas das transportadoras em um único schema comum (por exemplo, `status`, `estimated_delivery`) antes de retorná-las ao agente.",
+   "C": "Criar ferramentas de rastreamento separadas para cada transportadora para manter os schemas brutos distintos.",
+   "D": "Retornar tanto o schema normalizado quanto a resposta bruta completa para maximizar o contexto."
+  },
+  "text": "Um agente rastreia remessas usando ferramentas que chamam várias APIs diferentes de transportadoras. Cada transportadora retorna timestamps, status e códigos de atraso em formatos JSON completamente diferentes. Como você deve projetar a saída da ferramenta fornecida ao agente?"
+ },
+ "0690905067": {
+  "explanation": "O uso de ferramentas (function calling) é o mecanismo mais confiável para saída estruturada. Quando você define uma ferramenta com um input schema, o Claude é restringido a produzir uma saída que corresponda a esse schema como parte da resposta `tool_use` — e não como texto livre que poderia conter markdown ou artefatos de prosa. A análise por regex (A) é frágil e falha em casos extremos. As abordagens de duas passagens (C) dobram custo e latência sem agregar confiabilidade. As instruções de JSON baseadas em prompt (D) funcionam na maior parte das vezes, mas carecem da garantia estrutural que o uso de ferramentas oferece — crítico quando sistemas a jusante dependem de conformidade estrita com o schema. ---",
+  "options": {
+   "A": "Analisar a resposta em texto do Claude com padrões de regex para extrair objetos JSON, usando lógica de repetição para respostas malformadas.",
+   "B": "Definir uma ferramenta com um input schema correspondente à estrutura JSON exigida e extrair os dados da resposta `tool_use` do Claude.",
+   "C": "Fazer duas chamadas de API separadas — primeiro extraindo as informações como texto e depois pedindo ao Claude para formatar esse texto como JSON.",
+   "D": "Incluir instruções detalhadas de formatação JSON e um exemplo de template no system prompt, pedindo ao Claude para gerar apenas JSON válido."
+  },
+  "text": "O sistema extrai informações de candidatos (nome, dados de contato, habilidades, experiência profissional, formação) de currículos enviados. Os dados extraídos devem estar estritamente em conformidade com um JSON schema predefinido, pois campos obrigatórios ausentes ou tipos de dados incorretos causarão falhas de validação a jusante. Qual é a abordagem mais confiável?"
+ },
+ "0a5df405dd": {
+  "explanation": "A API do Claude é completamente stateless. Não há parâmetro de session ID (B), não há mecanismo de memória embutido (C não resolve o histórico ausente) e é improvável que a janela de contexto (A) encha com palavras de vocabulário. A aplicação é responsável por construir e passar o array `messages` completo em cada chamada de API. Este é um conhecimento fundamental para qualquer desenvolvedor que constrói sobre a API do Claude. ---",
+  "options": {
+   "A": "A janela de contexto do modelo encheu, fazendo com que o conteúdo anterior fosse descartado.",
+   "B": "Você precisa habilitar a persistência de conversa passando um parâmetro `session ID` em cada chamada de API.",
+   "C": "Seu system prompt precisa de instruções explícitas dizendo ao Claude para lembrar informações de turnos anteriores.",
+   "D": "Você não está incluindo as mensagens anteriores em cada requisição de API — a API stateless não retém o histórico da conversa."
+  },
+  "text": "Durante os testes iniciais, você percebe que o Claude não lembra de palavras de vocabulário do início da conversa. Quando um aluno pergunta \"Can you quiz me on those words?\", o Claude responde como se nenhuma palavra tivesse sido discutida. Qual é a explicação mais provável?"
+ },
+ "11027b19d2": {
+  "explanation": "Por que está correto: Enums criam um contrato de entrada estrito e restrito. Fornecer um enum de valores exatos de backend no schema da ferramenta permite que o modelo aproveite seu entendimento semântico para mapear a linguagem natural confusa do usuário (\"banco de dados de pesquisa\") para o requisito programático estrito (\"db_res_01\") *antes* da execução da ferramenta. Por que as outras são mais fracas: - **B)** Empurra a ambiguidade para o backend, tornando o comportamento imprevisível. - **C)** A rejeição desperdiça um turno de execução e aumenta a latência quando a validação poderia ser feita antecipadamente. - **D)** Pesquisar tudo dispara o custo, a latência e o inchaço do contexto. ** Lição do Exame:** Use campos `enum` nos schemas de ferramentas para mapear linguagem natural ambígua para valores estritos de backend, melhorando a confiabilidade do uso de ferramentas de forma determinística. ---",
+  "options": {
+   "A": "Usar um parâmetro `enum` listando explicitamente os nomes permitidos dos sistemas de banco de dados.",
+   "B": "Usar um parâmetro de string livre e usar correspondência aproximada (fuzzy) no backend para encontrar o banco de dados certo.",
+   "C": "Permitir strings livres, mas rejeitar a chamada da ferramenta em tempo de execução se o nome estiver incorreto.",
+   "D": "Por padrão, pesquisar todos os bancos de dados simultaneamente se o usuário for ambíguo."
+  },
+  "text": "Um agente precisa consultar bancos de dados internos específicos, mas os usuários frequentemente se referem a eles usando linguagem natural ambígua (por exemplo, \"banco de dados de pesquisa\" em vez de \"db_res_01\"). Como o schema de entrada da ferramenta deve ser projetado para lidar com isso de forma confiável?"
+ },
+ "182580571a": {
+  "explanation": "Por que está correto: As descrições de ferramentas são o mecanismo de maior alavancagem para resolver erros de seleção de ferramentas. Quando duas ferramentas têm capacidades sobrepostas, suas descrições precisam definir explicitamente restrições e limites negativos (por exemplo, `delete_file: \"Deleta permanentemente um arquivo. NÃO use isso para arquivos de backup ou conformidade—use archive_file em vez disso.\"`). Por que as outras são mais fracas: - **B)** Um prompt de confirmação protege contra danos, mas não corrige o fato de que o agente está fazendo a escolha errada lá na origem. - **C)** Uma mudança arquitetural massiva que pode não ser possível dados os requisitos do sistema. - **D)** O prompting few-shot é útil, mas atualizar as descrições nativas das ferramentas é a correção estrutural mais robusta. ** Lição do Exame:** Quando os modelos confundem ferramentas similares, reescreva as descrições das ferramentas para definir explicitamente os limites negativos e os cenários específicos de uso. ---",
+  "options": {
+   "A": "Expandir as descrições das ferramentas para definir claramente o propósito, os limites e os cenários específicos em que arquivar é preferível a deletar.",
+   "B": "Adicionar um prompt de confirmação diretamente dentro da lógica da ferramenta `delete_file`.",
+   "C": "Remover a ferramenta `delete_file` inteiramente e tratar as exclusões via um processo de lote separado.",
+   "D": "Fornecer exemplos few-shot no system prompt mostrando o uso correto."
+  },
+  "text": "Um agente tem acesso a uma ferramenta `archive_file` e a uma ferramenta `delete_file`. Ele frequentemente chama `delete_file` quando deveria ter arquivado um arquivo de backup. Qual é a maneira mais direta de corrigir esse erro de seleção de ferramenta?"
+ },
+ "1c45bbb468": {
+  "explanation": "Por que isto está correto: Uma métrica agregada de \"97% no geral\" é perigosa porque pode mascarar taxas de falha catastróficas em subconjuntos minoritários (por exemplo, faturas padrão podem ter 99,2% de acurácia, enquanto formulários manuscritos têm 61,0%). Você deve executar uma análise estratificada para detalhar a acurácia por tipo de documento e campo antes de automatizar, garantindo que você remova humanos apenas de segmentos seguros. Por que as outras são mais fracas: - **B)** Automatizar com base em métricas agregadas vai embarcar silenciosamente altas taxas de erro para casos extremos específicos. - **C)** A amostragem aleatória sub-representa tipos de documento raros ou difíceis. - **D)** A confiança autorrelatada pelo modelo é um indicador não confiável da acurácia real. ** Resumo para o exame:** Sempre segmente a acurácia por tipo de documento e campo antes de automatizar; métricas de acurácia geral mascaram taxas de falha por categoria. ---",
+  "options": {
+   "A": "Segmentar as métricas de acurácia por tipo de documento e campo.",
+   "B": "Implantar a automação globalmente no limiar de confiança de >=90%.",
+   "C": "Executar uma revisão por amostragem aleatória em todos os documentos antes de implantar.",
+   "D": "Aumentar o limiar de confiança para >=95% só por garantia."
+  },
+  "text": "Um sistema de extração operou com 100% de revisão humana por 3 meses. A análise mostra que extrações com confiança do modelo de >=90% têm 97% de acurácia no geral. Para reduzir a carga de trabalho dos revisores, você planeja automatizar as extrações de alta confiança. Antes de implantar, qual etapa de validação é mais crítica?"
+ },
+ "1e585414db": {
+  "explanation": "O problema é a dependência excessiva de regras condicionais explícitas que exigem que o usuário _declare_ seu nível. Um princípio geral (\"adaptar à expertise, espelhar a terminologia\") ativa o raciocínio contextual do modelo diante de qualquer sinal, incluindo os implícitos, como escolhas de vocabulário. Isso é mais flexível do que adicionar mais condicionais (D), que ainda exigem triggers enumerados. A triagem pré-conversa (C) adiciona atrito. Fazer perguntas de esclarecimento (A) é irritante para usuários avançados que já demonstraram expertise por meio de sua linguagem. ---",
+  "options": {
+   "A": "Adicionar uma instrução explícita para fazer uma pergunta de esclarecimento sempre que o nível de expertise não estiver imediatamente claro pela primeira mensagem.",
+   "B": "Substituir a maioria dos condicionais por um princípio geral: \"Adapt explanation depth to match user expertise, mirroring their terminology.\" Manter apenas o condicional crítico de segurança sobre consultas relacionadas a lesões.",
+   "C": "Implementar uma triagem pré-conversa pedindo aos usuários que avaliem seu nível de experiência.",
+   "D": "Adicionar mais ramificações condicionais para cobrir sinais adicionais de expertise, como \"If user mentions specific rep ranges or asks about periodization, treat as advanced.\""
+  },
+  "text": "Seu assistente de coaching fitness se adapta corretamente a declarações explícitas de expertise, mas tem dificuldade com sinais implícitos — recorrendo por padrão a respostas excessivamente detalhadas mesmo quando os usuários usam terminologia avançada. Qual mudança no system prompt aborda isso de forma mais direta?"
+ },
+ "1f14fee25d": {
+  "explanation": "Isso descreve como os loops agênticos funcionam fundamentalmente. Os resultados das ferramentas são retornados como mensagens na conversa; o modelo os lê e usa seu raciocínio para selecionar a próxima ação. Não há uma camada de orquestração separada, árvore de decisão ou sequência pré-planejada — o modelo determina dinamicamente os próximos passos com base no que observa. Uma compra de 45 dias atrás pode estar fora da janela de devolução, o que o modelo pode considerar e decidir escalar em vez de processar o reembolso. Esse raciocínio dinâmico, conduzido pelo modelo, é o que distingue agentes de fluxos de trabalho roteirizados. ---",
+  "options": {
+   "A": "A camada de orquestração roteia automaticamente para a próxima ferramenta com base no campo de status do pedido.",
+   "B": "O agente executa os passos restantes em uma sequência de ferramentas planejada no início da requisição.",
+   "C": "O agente segue uma árvore de decisão pré-configurada que mapeia atributos do pedido para chamadas de ferramentas específicas.",
+   "D": "Os detalhes do pedido são adicionados à conversa e o modelo raciocina sobre qual ação tomar."
+  },
+  "text": "Quando o agente chama `lookup_order` e recebe os detalhes do pedido mostrando que o item foi comprado há 45 dias, como o loop agêntico determina se deve chamar `process_refund` ou `escalate_to_human` em seguida?"
+ },
+ "2232922432": {
+  "explanation": "Em um sistema multiagente, a camada de ferramentas deve absorver a complexidade para que o orquestrador possa raciocinar em nível semântico. Normalizar para um schema comum significa que o orquestrador sempre trabalha com conceitos consistentes, independentemente de qual fonte de dados foi usada. Respostas brutas (B) forçam o orquestrador a interpretar formatos específicos de cada fonte, aumentando o risco de erro. Ferramentas separadas por transportadora (D) é semanticamente estranho — \"rastrear uma remessa\" é um único conceito que deveria ter uma única interface. Tanto o resumo quanto o bruto (C) duplicam o uso de tokens sem agregar valor ao raciocínio. ---",
+  "options": {
+   "A": "Retornar um schema normalizado com os campos `status`, `estimated_delivery`, `delay_reason` e `requires_action`, convertendo os formatos das transportadoras internamente.",
+   "B": "Retornar as respostas brutas das transportadoras com metadados de origem, codificando a lógica de interpretação específica de cada transportadora no system prompt.",
+   "C": "Retornar tanto um resumo normalizado quanto a resposta bruta completa da transportadora em cada chamada de ferramenta.",
+   "D": "Projetar endpoints de ferramenta separados para cada transportadora (`track_fedex`, `track_ups`, `track_dhl`) com schemas de resposta específicos por transportadora."
+  },
+  "text": "Sua ferramenta de rastreamento de remessas consulta múltiplas transportadoras (FedEx, UPS, DHL) que retornam informações de status em formatos diferentes — a FedEx usa códigos numéricos, a UPS usa frases descritivas e a DHL retorna arrays de eventos com timestamp. O agente usa os resultados para determinar o status de entrega e escalar remessas atrasadas. Como você deve estruturar o valor de retorno da ferramenta para melhor habilitar o raciocínio do agente?"
+ },
+ "28f9e3e419": {
+  "explanation": "O MCP define `isError: true` no resultado da ferramenta como o mecanismo correto para comunicar falhas em nível de ferramenta. Isso mantém o erro no loop de raciocínio do modelo para que ele possa responder apropriadamente. Retornar um resultado vazio (B) deturpa a situação — o modelo não consegue distinguir \"pedido não encontrado\" de \"nada encontrado\". Um campo \"status\" em uma resposta de sucesso (C) confunde a semântica de sucesso e falha. Lançar exceções (D) é um erro em nível de protocolo e remove a falha completamente da consciência do modelo. ---",
+  "options": {
+   "A": "Retornar a mensagem de erro no conteúdo do resultado da ferramenta com a flag `isError` definida como `true`.",
+   "B": "Registrar o erro no lado do servidor e retornar um resultado vazio para evitar confundir o modelo.",
+   "C": "Retornar uma resposta de sucesso com um campo \"status\" indicando o tipo de erro.",
+   "D": "Lançar uma exceção do handler da ferramenta para que o framework do agente possa capturá-la e registrá-la."
+  },
+  "text": "Ao implementar sua ferramenta MCP `lookup_order`, o backend às vezes retorna erros (por exemplo, \"Order not found\" ou falhas temporárias do banco de dados). Qual é o padrão correto para comunicar esses erros de volta ao agente?"
+ },
+ "2dc254abcf": {
+  "explanation": "Em um fluxo de trabalho multiagente, as saídas das ferramentas devem ser estruturadas para servir como entradas para as ferramentas subsequentes. Ferramentas de ação como `share_document` e `move_document` exigem `document_id` — elas não conseguem trabalhar com títulos ou descrições em prosa. Isso é fundamental no design de encadeamento de ferramentas: o formato de saída de um agente trabalhador deve corresponder aos requisitos de parâmetros das ferramentas trabalhadoras subsequentes. Strings legíveis por humanos (A, C) exigiriam que o orquestrador \"adivinhasse\" IDs que nunca foram retornados, tornando o encadeamento não confiável e propenso a erros. ---",
+  "options": {
+   "A": "Descrições legíveis por humanos mais detalhadas, incluindo tamanhos de arquivo e autores.",
+   "B": "URLs em que os usuários possam clicar para acessar os documentos em seu navegador.",
+   "C": "Um array JSON de títulos de documentos extraídos dos resultados da busca.",
+   "D": "Dados estruturados contendo IDs de documentos e metadados para cada resultado."
+  },
+  "text": "Sua ferramenta `search_documents(query)` retorna resultados em texto puro: \"Found 3 documents: 'Q1 Budget Proposal', 'Q2 Budget Forecast', 'Annual Review'\". Você quer que o agente encadeie isso com `share_document(document_id, email)` e `move_document(document_id, folder)`. Qual formato de retorno melhor habilitaria esses fluxos de trabalho de múltiplos passos?"
+ },
+ "2e9c9c8911": {
+  "explanation": "`context_length_exceeded` significa que os documentos são _grandes demais para serem processados como estão_ — aumentar `max_tokens` (A) não ajudará, já que `max_tokens` controla o tamanho da _saída_, não a capacidade de entrada. Resubmeter todos os 10.000 documentos (B, D) desperdiça o custo dos 9.700 bem-sucedidos. A abordagem correta é resubmeter apenas as 300 falhas, divididas em pedaços que caibam na janela de contexto, e depois combinar as extrações parciais. ---",
+  "options": {
+   "A": "Aumentar o parâmetro `max_tokens` para os 300 documentos que falharam e resubmetê-los em um novo batch.",
+   "B": "Resubmeter o batch inteiro de 10.000 documentos usando um nível de modelo com uma janela de contexto maior.",
+   "C": "Resubmeter apenas os 300 documentos que falharam após dividi-los em pedaços menores, depois combinar as extrações parciais.",
+   "D": "Reprocessar o batch inteiro com prompt caching habilitado para reduzir o custo de repetir requisições com system prompts idênticos."
+  },
+  "text": "Após a conclusão do seu batch diário de 10.000 documentos, 300 documentos (3%) falharam com erros de \"context_length_exceeded\". O arquivo de resultados identifica cada falha por `custom_id`. Qual é a abordagem mais econômica para processar essas falhas?"
+ },
+ "30221f3a75": {
+  "explanation": "Por que está correto: Se uma regra *não pode* ser contornada, ela deve ser aplicada de forma determinística no backend, e não probabilisticamente no LLM. Implementar o limite dentro do código da ferramenta garante que, mesmo que o agente alucine ou seja submetido a prompt injection, qualquer payload acima de $500 degrade graciosamente para um estado de \"aprovação pendente\" sem violar a política. Por que as outras são mais fracas: - **A)** Deixa o controle de segurança nas mãos do LLM; o agente poderia alucinar `requires_approval=false`. - **C)** Restrições por prompt são probabilísticas e facilmente contornáveis. - **D)** A seleção de ferramenta pelo agente pode falhar; se ele escolher `disburse` para uma cobrança de $800, a política é violada. ** Lição da prova:** Regras de negócio rígidas e limites de aprovação devem ser aplicados de forma determinística dentro da lógica da ferramenta no backend, nunca via instruções de prompt ou seleção de ferramenta pelo agente. ---",
+  "options": {
+   "A": "Adicionar um parâmetro booleano `requires_approval` ao schema da ferramenta que o agente deve definir.",
+   "B": "Aplicar o limite de $500 dentro da própria lógica da ferramenta `process_reimbursement`.",
+   "C": "Escrever um system prompt rigoroso instruindo o agente a nunca desembolsar valores acima de $500.",
+   "D": "Fornecer duas ferramentas separadas (`disburse` e `request_approval`) e confiar que o agente selecione corretamente."
+  },
+  "text": "Um agente processa reembolsos de funcionários. A política da empresa determina que pagamentos acima de $500 devem ir para uma fila de aprovação pendente e não podem ser desembolsados automaticamente. Você precisa garantir que esse limite absolutamente não possa ser contornado pelo agente. Onde essa regra deve ser aplicada?"
+ },
+ "32175a4552": {
+  "explanation": "Por que isto está correto: Quando um pipeline trava no meio da execução, os resultados de ferramentas naquela sessão tornam-se obsoletos e não confiáveis. Retomar cegamente arrisca o agente reprocessar dados ou corromper o contexto. O padrão correto é extrair o trabalho concluído para um arquivo de checkpoint JSON estruturado e durável, iniciar uma *nova* sessão e injetar esse checkpoint no topo do prompt. Você deve dizer explicitamente ao agente quais documentos estão completos, quais estão parciais (por seção) e quais estão pendentes. Por que as outras são mais fracas: - **A)** Resultados de ferramentas obsoletos da sessão que travou são não confiáveis. - **B)** `fork_session` serve para exploração divergente paralela, não para recuperação de falha de pipeline. - **D)** O agente provavelmente refará o trabalho concluído ou pulará completamente o documento processado parcialmente. ** Lição para a prova:** Extraia o trabalho concluído para um arquivo de checkpoint estruturado, inicie uma nova sessão e injete explicitamente o checkpoint — nunca use `--resume` cegamente em uma sessão travada com resultados de ferramentas obsoletos. ---",
+  "options": {
+   "A": "Executar o comando `--resume` diretamente na sessão que travou.",
+   "B": "Usar `fork_session` a partir do ponto da falha para ramificar a execução.",
+   "C": "Escrever as descobertas concluídas em um arquivo de checkpoint estruturado, iniciar uma nova sessão e injetar o checkpoint como contexto estruturado.",
+   "D": "Retomar a sessão sem registrar os estados parciais dos documentos."
+  },
+  "text": "Um pipeline de pesquisa multiagente trava após processar 12 de 18 documentos. Cada agente concluiu parcialmente seu trabalho. Você precisa retomar o pipeline sem perder a fidelidade das descobertas anteriores nem repetir o trabalho já concluído. Qual é a melhor abordagem de gerenciamento de estado?"
+ },
+ "369215a9f9": {
+  "explanation": "Por que isto está correto: Passar mais de 138k tokens de conteúdo bruto para o agente de relatório desperdiça orçamento, infla a latência e dispara o efeito de \"perdido no meio\" (em que o LLM ignora o contexto no meio de um prompt enorme). Passar pouco demais causa alucinações. O equilíbrio ideal é passar a espinha dorsal narrativa densa (3k) mais um índice de citações compacto e estruturado (5–8k tokens) representando apenas os metadados essenciais `{citation_id, claim, source, key_quote}`. Por que as outras são mais fracas: - **A)** Causa \"perdido no meio\" e inchaço massivo de tokens. - **B)** O agente de relatório não terá dados de citação e fabricará fontes. - **C)** Cadeias de raciocínio são internas ao agente anterior e apenas adicionam ruído a jusante. ** Lição para a prova:** Passe a narrativa de síntese mais um índice de citações estruturado; remova completamente o conteúdo bruto e as cadeias de raciocínio para evitar a degradação de \"perdido no meio\". ---",
+  "options": {
+   "A": "Passar os 120k tokens de conteúdo bruto e todas as saídas intermediárias.",
+   "B": "Passar apenas a narrativa de síntese de 3k tokens.",
+   "C": "Passar a narrativa de síntese e a cadeia completa de raciocínio da análise de documentos.",
+   "D": "Passar a narrativa de síntese junto com um índice de citações enxuto e estruturado e sinalizadores de conflito."
+  },
+  "text": "Um agente de busca na web reúne 120k tokens de conteúdo bruto, um agente de análise de documentos extrai 15k tokens de insights e um agente de síntese produz um rascunho narrativo de 3k tokens. O coordenador agora precisa passar o contexto para um agente de geração de relatório para a saída final com citações apropriadas. Qual estratégia de passagem de contexto oferece o melhor equilíbrio entre completude e eficiência?"
+ },
+ "372b5938c9": {
+  "explanation": "Por que isto está correto: O guia recomenda explicitamente refinar os prompts em uma amostra representativa *antes* de processar grandes volumes em batch. Resubmissões iterativas em escala destroem a economia de custos da Batch API. Ao corrigir os modos de falha em uma amostra localizada, você garante que o prompt seja robusto, maximizando o sucesso na primeira passagem quando você finalmente disparar a execução do batch de 50.000 documentos. Por que as outras são mais fracas: - **B)** Pagar pelo aprendizado de prompt em batches do tamanho de produção resulta em ciclos de resubmissão massivos e caros. - **C)** A API síncrona joga fora os 50% de economia de custos da Batch API. - **D)** Ainda paga pelo aprendizado iterativo de falhas em larga escala. ** Resumo para o exame:** Refine os prompts em uma amostra representativa primeiro para maximizar o sucesso na primeira passagem, depois execute o volume completo pela Batch API para minimizar resubmissões caras. ---",
+  "options": {
+   "A": "Refinar o prompt interativamente em uma amostra representativa para maximizar o sucesso na primeira passagem e, em seguida, processar todos os 50.000 documentos via Batch API.",
+   "B": "Usar a Batch API para processar todos os 50.000 documentos imediatamente, identificar as falhas em escala e resubmetê-las.",
+   "C": "Processar os 50.000 documentos usando a API síncrona para lidar com o refinamento de prompt dinamicamente por documento.",
+   "D": "Começar a submeter batches de 5.000 documentos para aprender incrementalmente os modos de falha em produção."
+  },
+  "text": "Você está se preparando para processar 50.000 documentos legados usando a Batch API. Um teste inicial em 500 documentos revela que 18% deles exigem de 2 a 3 refinamentos de prompt para extrair os dados corretamente. Qual é a estratégia mais econômica para escalar essa carga de trabalho?"
+ },
+ "3b49ea7c59": {
+  "explanation": "O problema raiz é que o modelo não consegue distinguir falhas permanentes de transitórias quando ambas retornam texto simples. Adicionar uma flag `retriable: false` dá ao modelo um sinal inequívoco para parar de tentar novamente e comunicar o motivo da política ao cliente. Incluir uma explicação amigável ao cliente significa que o modelo pode usar esse texto imediatamente em sua resposta. A opção C adiciona uma chamada de pré-verificação obrigatória, aumentando a latência para todo reembolso, incluindo os 83% que são válidos. A opção A resolve apenas metade do problema — ela trata os retries do lado da ferramenta mas não dá ao modelo contexto acionável para falhas de negócio permanentes. ---",
+  "options": {
+   "A": "Implementar lógica de retry automático no nível da ferramenta apenas para erros técnicos, repassando os erros de negócio ao Claude sem retries.",
+   "B": "Retornar respostas de erro estruturadas com `retriable: false` para erros de negócio e uma explicação amigável ao cliente para o Claude usar.",
+   "C": "Adicionar uma ferramenta `check_refund_eligibility` que deve ser chamada antes de `process_refund` para evitar violações de regras de negócio.",
+   "D": "Adicionar exemplos few-shot mostrando como distinguir erros que permitem retry dos que não permitem analisando o texto da mensagem de erro."
+  },
+  "text": "Sua ferramenta `process_refund` retorna dois tipos de erro: erros técnicos (\"503 Service Unavailable\", \"Connection timeout\") que são transitórios (5% das chamadas), e erros de negócio (\"Order exceeds 30-day return window\", \"Item already refunded\") que são permanentes (12% das chamadas). O agente desperdiça 3-4 turnos tentando novamente os erros de negócio. Atualmente, ambos os tipos de erro retornam apenas uma mensagem de texto simples. Qual é a forma mais eficaz de reduzir as tentativas desperdiçadas enquanto melhora a qualidade da resposta voltada ao cliente?"
+ },
+ "3d944eeaf1": {
+  "explanation": "O \"desvio na obediência a instruções\" (instruction following drift) em conversas longas é um fenômeno conhecido em que a atenção do modelo às instruções iniciais enfraquece à medida que mais contexto se acumula. Reforçar periodicamente as diretrizes críticas em pontos de quebra naturais reancora o comportamento do modelo. A opção A (reiniciar aos 20 turnos) atrapalha a experiência do usuário. Mover as instruções para o turno do usuário (C) dá a elas menos autoridade do que o system prompt. A regeneração automática (D) é cara e cria latência imprevisível. ---",
+  "options": {
+   "A": "Iniciar automaticamente uma nova conversa após 20 turnos, passando um resumo do contexto anterior.",
+   "B": "Inserir mensagens de papel user que reforcem diretrizes críticas em pontos de quebra naturais da conversa, especialmente antes de solicitações complexas.",
+   "C": "Mover as diretrizes de comportamento do system prompt para a primeira mensagem do usuário.",
+   "D": "Implementar validação pós-resposta que regenera cada resposta até que ela esteja em conformidade com as diretrizes especificadas."
+  },
+  "text": "Durante os testes de QA, o Claude segue as diretrizes do seu system prompt de forma consistente nos primeiros 10-15 turnos, mas por volta do turno 25-30, as respostas começam a divergir — tom informal, formatação ignorada, informações restritas aparecendo. O contexto está bem dentro dos limites. Qual é a abordagem mais eficaz para manter um comportamento consistente?"
+ },
+ "3fc50309ba": {
+  "explanation": "Por que isto está correto: Saídas estruturadas fornecem um contrato de schema estável. Em vez de usar regex ou interpretação difusa de texto para extrair um número de conta ou um valor monetário de uma resposta em prosa verbosa, os sistemas a jusante (e as ferramentas subsequentes do agente) podem referenciar diretamente as chaves JSON exatas. Isso reduz drasticamente os erros de integração em operações encadeadas. Por que as outras são mais fracas: - **A)** O JSON impõe o *formato*, mas o raciocínio do LLM continua fundamentalmente probabilístico. - **B)** Verificações de schema validam o formato, não a correção semântica (veracidade). - **C)** O JSON frequentemente *aumenta* o overhead de tokens devido à repetição de chaves/colchetes. ** Lição para a prova:** Saída estruturada dá aos agentes acesso confiável a campos, prevenindo erros a jusante associados à interpretação de texto livre. ---",
+  "options": {
+   "A": "Torna o processo de raciocínio do LLM perfeitamente determinístico.",
+   "B": "Garante a veracidade semântica dos dados obtidos das APIs de backend.",
+   "C": "Reduz significativamente o consumo de tokens em comparação com texto padrão.",
+   "D": "Permite que o agente e os sistemas a jusante acessem campos específicos de forma confiável e direta, sem precisar interpretar texto livre."
+  },
+  "text": "Ao projetar fluxos de trabalho agênticos, qual é a principal vantagem de impor saída JSON estruturada para respostas de ferramentas e saídas de agentes?"
+ },
+ "415f6bb17a": {
+  "explanation": "Valores nulos para pros/cons sinalizam \"esta informação não estava presente na fonte\" — semanticamente distinto de um array vazio, que poderia significar \"o avaliador não tinha prós/contras específicos a mencionar.\" Null comunica explicitamente a _ausência de informação_, prevenindo a fabricação. Adicionar `\"unclear\"` ao enum de sentimento dá ao modelo uma opção válida para conteúdo genuinamente ambíguo ou sarcástico. Arrays vazios (D) são semanticamente ambíguos. Campos opcionais (B) não sinalizam a diferença entre \"não mencionado\" e \"mencionado, mas vazio.\" Pontuações de confiança (C) sinalizam o problema, mas não corrigem a lacuna de schema que causa a fabricação. ---",
+  "options": {
+   "A": "Permitir valores `null` para pros/cons e adicionar `\"unclear\"` ao enum de sentimento.",
+   "B": "Tornar pros e cons campos opcionais e adicionar `\"neutral\"` e `\"unclear\"` ao enum de sentimento.",
+   "C": "Adicionar um campo `extraction_confidence` (0.0-1.0) para cada valor e filtrar as saídas em que qualquer confiança caia abaixo de um limiar.",
+   "D": "Permitir arrays vazios para pros/cons como saída válida e adicionar `\"unclear\"` ao enum de sentimento."
+  },
+  "text": "O sistema processa avaliações de produtos usando uso de ferramentas com um schema definido: `rating` (inteiro de 1 a 5), `pros` (array de strings), `cons` (array de strings) e `overall_sentiment` (enum: positive, negative, mixed). Dois problemas surgem com avaliações breves ou ambíguas (~20% do dataset): (1) para avaliações como \"Great product!\", o Claude fabrica prós e contras específicos, e (2) para avaliações sarcásticas como \"Well that was... interesting\", o Claude escolhe o sentimento arbitrariamente, já que não há opção para casos ambíguos. Qual modificação de schema aborda melhor ambos os problemas?"
+ },
+ "41a21eb6c1": {
+  "explanation": "Regras de negócio críticas que não devem poder ser contornadas apenas por prompting pertencem a código confiável do lado do servidor — não apenas a instruções que o modelo pode ignorar. Mover a verificação do limite para _dentro_ da ferramenta significa que ela executa como parte da lógica de desembolso, independentemente de como o modelo é instruído ou de quais parâmetros ele passa. A opção A depende de o modelo escolher a ferramenta correta. A opção B, via hook, chega mais perto, mas apenas adiciona uma _flag_ que a ferramenta ainda verifica — um parâmetro que o modelo ainda poderia manipular. A opção C é a mais fraca: ela coloca um booleano crítico para a segurança diretamente sob controle do modelo. A aplicação interna à ferramenta é o padrão mais resistente a adulteração aqui porque a política roda em caminhos de código confiáveis, independentes de bits de aprovação controlados pelo modelo. ---",
+  "options": {
+   "A": "Fornecer duas ferramentas: `auto_reimburse` (limite fixo de $500) e `request_manager_approval`. Incluir instruções detalhadas no system prompt dizendo ao agente para verificar o valor e chamar a ferramenta apropriada. Adicionar um hook PostToolUse para auditoria.",
+   "B": "Implementar a verificação do limite em um hook PreToolUse que inspeciona o parâmetro de valor antes de `process_reimbursement` executar. Se o valor exceder $500, o hook modifica a chamada da ferramenta para adicionar uma flag `requires_approval: true`, que a ferramenta verifica antes de desembolsar.",
+   "C": "A ferramenta `process_reimbursement` aceita um parâmetro `approved_by_manager: boolean`. O system prompt instrui o agente a definir isso como `true` apenas após confirmar a aprovação do gerente. Um script de auditoria noturno revisa todas as aprovações.",
+   "D": "A ferramenta `process_reimbursement` aceita valor e detalhes, e internamente aplica o limite: valores ≤$500 são desembolsados automaticamente; valores >$500 fazem a ferramenta criar uma solicitação de aprovação pendente e retornar um status indicando que a revisão pelo gerente está pendente."
+  },
+  "text": "Seu agente de reembolso de despesas processa solicitações de funcionários usando uma ferramenta `process_reimbursement`. A política da empresa exige que reembolsos acima de $500 sejam aprovados por um gerente antes do desembolso dos fundos. O agente lida com centenas de solicitações diariamente, e você precisa que a aplicação do limite seja à prova de adulteração, independentemente de como o agente seja instruído. Qual design garante que o limite de aprovação de $500 não possa ser contornado?"
+ },
+ "4541e02fa8": {
+  "explanation": "Por que isto está correto: Subagentes começam com conhecimento zero e *não* herdam automaticamente o histórico de conversa do coordenador. O coordenador deve injetar explicitamente todas as saídas dos agentes anteriores diretamente no prompt do subagente de síntese. Usar um formato estruturado (por exemplo, `{claim, evidence, source_url, date}`) garante que o conteúdo, os metadados de origem e a temporalidade sejam preservados, para que o agente de síntese possa atribuir as descobertas corretamente. Por que as outras são mais fracas: - **A)** Viola o escopo das ferramentas. Agentes de síntese devem sintetizar, não realizar buscas. - **B)** Impossibilidade arquitetural; subagentes não podem herdar o contexto do coordenador. - **C)** Um resumo em prosa perde a atribuição de origem, ou seja, o agente de síntese não consegue citar fontes que não possui. ** Lição para a prova:** Injete explicitamente todas as descobertas anteriores diretamente no prompt do subagente usando um formato estruturado `{claim, evidence, source, date}`; nunca confie na herança de contexto nem passe resumos apenas em prosa. ---",
+  "options": {
+   "A": "Deixar o subagente de síntese chamar as ferramentas de busca e análise por conta própria.",
+   "B": "Deixar o subagente de síntese ler diretamente do histórico de sessão do coordenador.",
+   "C": "Passar um resumo em prosa das descobertas ao subagente de síntese.",
+   "D": "Passar as descobertas completas embutidas diretamente no prompt do subagente de síntese, usando um formato estruturado que separa o conteúdo dos metadados."
+  },
+  "text": "Depois que os subagentes de busca na web e de análise de documentos terminam suas tarefas, o coordenador precisa criar um subagente de síntese para combinar as descobertas. Qual é a abordagem correta para fornecer ao subagente de síntese as informações de que ele precisa?"
+ },
+ "466ecb1bb9": {
+  "explanation": "A causa está identificada: os resultados de RAG acumulados estão sufocando o histórico da conversa. A correção direcionada é manter apenas o contexto de RAG recente e relevante (últimas 2-3 consultas), protegendo o histórico da conversa que sustenta a coerência. Resultados de RAG de 10 turnos atrás são provavelmente irrelevantes para a consulta atual. A opção C troca um problema (inchaço do RAG) por outro (coerência da conversa). A opção A comprime, mas não poda resultados obsoletos. A opção D é computacionalmente cara e não aborda o problema de recência. ---",
+  "options": {
+   "A": "Comprimir todos os resultados de RAG em um documento de resumo consolidado que se atualiza incrementalmente após cada recuperação.",
+   "B": "Implementar uma janela deslizante para os resultados de RAG das últimas 2-3 consultas, preservando o histórico da conversa.",
+   "C": "Deslocar o orçamento de contexto para favorecer os resultados de RAG, reduzindo a alocação do histórico da conversa.",
+   "D": "Implementar deduplicação semântica para identificar e remover informações redundantes entre os resultados de RAG acumulados e os turnos da conversa."
+  },
+  "text": "A análise de desempenho revela que seu contexto é composto por resultados de RAG acumulados de todas as consultas anteriores, o que está sufocando o histórico da conversa e causando degradação de coerência após mais de 15 turnos. Qual abordagem aborda melhor esse problema?"
+ },
+ "4946507b7e": {
+  "explanation": "Por que isto está correto: Descobertas em prosa não estruturada perdem a proveniência. Se os subagentes retornarem texto puro, o coordenador não tem base estruturada para distinguir metodologias de alta qualidade de meras suposições. Os subagentes devem retornar objetos estruturados `{claim, source_type, methodology, confidence, date}`. Quando as afirmações entram em conflito, um sinalizador programático `conflict_detected` força o agente de síntese a tratá-lo explicitamente, apresentando ambos os valores com seu contexto de origem no relatório final, em vez de colapsá-los silenciosamente. Por que as outras são mais fracas: - **A)** Uma regra baseada em prompt é probabilística e falha se apenas dados não revisados por pares estiverem disponíveis. - **B)** Recência não é sinônimo de precisão. - **C)** Calcular a média fabrica um número que nenhuma das fontes sustenta, destruindo a atribuição. ** Lição para a prova:** Exija que os subagentes retornem objetos de metadados estruturados e use um booleano `conflict_detected` para que os agentes de síntese preservem ambos os valores com atribuição, em vez de colapsá-los silenciosamente. ---",
+  "options": {
+   "A": "Instruir o coordenador a sempre preferir fontes revisadas por pares.",
+   "B": "Pedir ao subagente de síntese que escolha o número mais recente.",
+   "C": "Fazer o coordenador calcular a média dos dois valores conflitantes.",
+   "D": "Exigir que os subagentes retornem dados estruturados com metadados de metodologia/confiança e um sinalizador `conflict_detected` para preservar ambos os valores."
+  },
+  "text": "Os relatórios finais lidam mal com incerteza de forma consistente. Por exemplo, um agente de busca na web retorna uma estimativa de $50B (metodologia não especificada), enquanto um agente de análise de documentos retorna uma estimativa de $35B (±$7B, IC de 95%). O coordenador ou escolhe uma arbitrariamente ou produz uma afirmação vaga e cheia de ressalvas. Qual abordagem melhor evita isso?"
+ },
+ "4d33397a9d": {
+  "explanation": "Por que isto está correto: Quando um fluxo de trabalho é altamente previsível, obrigatório e segue exatamente a mesma decomposição todas as vezes, o *encadeamento de prompts* é o padrão superior. Como estilo, segurança e documentação são lentes cognitivas totalmente diferentes, encadeá-los sequencialmente em passes isolados evita a diluição de atenção (o modelo esquecer de verificar a segurança enquanto se obceca pelo estilo). Por que as outras são mais fracas: - **A)** A decomposição dinâmica serve para fluxos de trabalho imprevisíveis, em que as tarefas necessárias mudam a cada requisição do usuário. - **B)** Roteamento implica que apenas *um* dos especialistas executa o trabalho. O enunciado diz que *todo* PR recebe os três. - **C)** Prompts gigantescos do tipo tudo-em-um levam a severa diluição de atenção e a instruções ignoradas. ** Lição para a prova:** Use encadeamento de prompts para fluxos de trabalho previsíveis, estáticos e de múltiplos aspectos; isole tarefas cognitivas distintas em passes sequenciais separados antes de mesclá-las em uma saída final. ---",
+  "options": {
+   "A": "Decomposição dinâmica em subagentes, deixando um agente coordenador decidir caso a caso quais aspectos verificar.",
+   "B": "Um agente de roteamento que categoriza o PR e o envia para um especialista em estilo, segurança ou documentação.",
+   "C": "Um único prompt gigantesco instruindo um agente a analisar os três aspectos simultaneamente.",
+   "D": "Encadeamento de prompts: revisar estilo, segurança e documentação em passes sequenciais separados e, em seguida, mesclar as saídas em uma síntese final."
+  },
+  "text": "Um agente é responsável por revisar pull requests. Todo PR deve ser revisado quanto a três aspectos específicos: estilo de código, vulnerabilidades de segurança e precisão da documentação. Qual padrão arquitetural é mais adequado para esse fluxo de trabalho?"
+ },
+ "4e4a5ca64f": {
+  "explanation": "Três questões paralelas exigem rastrear pontos de dados específicos (IDs, valores, status, resoluções) — e não a prosa da conversa. Uma camada de contexto estruturada separada atua como uma \"memória de trabalho\" persistente, compacta e não sujeita ao truncamento da janela. A janela deslizante (A) teria descartado a discussão sobre o reembolso dos turnos 1-15 já no turno 48. Resumos narrativos (C) perdem os dados precisos necessários para responder \"What happened with my refund?\" A nova busca via ferramenta (B) recupera o estado atual, mas não consegue recuperar o histórico de ações realizadas durante a sessão. ---",
+  "options": {
+   "A": "Implementar um contexto de janela deslizante que retém os 30 turnos mais recentes.",
+   "B": "Confiar em ferramentas MCP para buscar novamente as informações relevantes sob demanda quando o cliente referenciar questões anteriores.",
+   "C": "Resumir os turnos anteriores em uma descrição narrativa, preservando o histórico completo de mensagens apenas para a questão ativa.",
+   "D": "Extrair e persistir dados estruturados das questões (IDs de pedido, valores, status) em uma camada de contexto separada."
+  },
+  "text": "Um cliente levanta três questões separadas durante uma sessão: uma consulta sobre reembolso (turnos 1-15), uma pergunta sobre assinatura (turnos 16-30) e uma atualização de método de pagamento (turnos 31-45). No turno 48, o cliente pergunta \"What happened with my refund?\" A conversa está se aproximando dos limites de contexto. Qual estratégia melhor mantém a capacidade do agente de tratar todas as questões ao longo da sessão?"
+ },
+ "4f00b64507": {
+  "explanation": "Informações diferentes exigem estratégias de preservação diferentes. Fatos críticos que nunca podem ser perdidos — restrições de segurança, fixações de versão, termos definidos pelo usuário — pertencem a uma seção de referência estruturada. A discussão geral sobre a abordagem pode ser resumida. As trocas recentes permanecem literais para garantir continuidade. Um único resumo (A) corre o risco de perder dados críticos de segurança mencionados no início. A busca semântica (B) é arriscada para informações críticas de segurança que podem não corresponder à semântica da consulta atual. A janela deslizante (D) descarta dados críticos se ocorreram no início da sessão. ---",
+  "options": {
+   "A": "Resumir todo o histórico da conversa em um resumo conciso e, em seguida, anexar as novas mensagens daí em diante.",
+   "B": "Armazenar a conversa completa externamente e usar busca semântica para recuperar as partes relevantes a cada turno.",
+   "C": "Extrair dados estruturados críticos (alergias, número de porções, termos definidos pelo usuário) para uma seção de referência compacta, resumir a discussão geral e reter as trocas recentes literalmente.",
+   "D": "Implementar uma janela deslizante retendo apenas os 20.000 tokens mais recentes, contando com os usuários para reafirmar informações importantes quando relevante."
+  },
+  "text": "Após uma sessão de 40 minutos, a conversa cresceu para 78.000 tokens. O histórico inclui: (1) uma alergia grave a frutos do mar, (2) medidas específicas dimensionadas para 8 porções, (3) um termo definido pelo usuário (\"room temperature\" = 68°F) e (4) idas e vindas gerais sobre timing e apresentação. Você precisa implementar gerenciamento de contexto. Qual abordagem melhor equilibra preservação com redução de tokens?"
+ },
+ "56b2e43717": {
+  "explanation": "O roteamento baseado em risco — direcionar a capacidade de revisão para as extrações com maior probabilidade de conter erros — maximiza o valor da capacidade limitada de revisores. Baixa confiança do modelo e ambiguidade/contradição na fonte são fortes preditores de erros de extração. A amostragem aleatória (B) desperdiça capacidade em extrações de alta qualidade. O roteamento por falha a jusante (C) é reativo — os erros já se propagaram. O roteamento baseado em entidades (D) sobre-roteia extrações potencialmente de alta qualidade de campos críticos, ao mesmo tempo em que deixa passar extrações de baixa confiança de campos menos críticos. ---",
+  "options": {
+   "A": "Rotear extrações em que o modelo indica baixa confiança ou em que os documentos de origem contêm informações ambíguas ou contraditórias.",
+   "B": "Amostrar aleatoriamente 5% das extrações para revisão.",
+   "C": "Rotear extrações para revisão apenas quando sistemas a jusante relatarem problemas de qualidade de dados ou falhas de processamento.",
+   "D": "Rotear extrações que contêm tipos específicos de entidades de alta prioridade (por exemplo, valores financeiros, datas) para revisão humana, independentemente da confiança da extração."
+  },
+  "text": "Seu pipeline de extração valida as saídas contra JSON schemas, mas você precisa implementar revisão humana dada a capacidade limitada de revisores (aproximadamente 5% do volume total). Qual é o critério mais eficaz para selecionar quais extrações rotear para revisão humana?"
+ },
+ "5a0072f82e": {
+  "explanation": "`isError: true` deve ser reservado para _falhas de execução_ — situações em que a ferramenta não conseguiu concluir sua tarefa. Um conjunto de resultados vazio é uma execução bem-sucedida que não retornou dados. Definir `isError: true` para resultados vazios (B) corrompe o sinal: o orquestrador não consegue distinguir \"a API quebrou\" de \"nenhum resultado encontrado\". Uma resposta estruturada com `success: true` e um `results: []` vazio comunica com precisão o que aconteceu. A opção D é um aprimoramento interessante, mas não corrige a falha de comunicação raiz que causa as retentativas desnecessárias. ---",
+  "options": {
+   "A": "Retornar uma string em linguagem natural descrevendo o resultado, permitindo que o agente o interprete contextualmente.",
+   "B": "Retornar um objeto de resultado com `isError: true` e uma mensagem explicando que nenhum produto correspondeu.",
+   "C": "Retornar um resultado estruturado com um booleano `success` e um array `results`, reservando `isError: true` apenas para falhas reais de execução.",
+   "D": "Adicionar um campo `suggestions` contendo estratégias de busca alternativas quando os resultados estiverem vazios."
+  },
+  "text": "Sua ferramenta de busca de produtos consulta uma API de catálogo externa e retorna itens correspondentes. O agente frequentemente refaz buscas imediatamente após receber zero resultados, tratando \"nenhuma correspondência encontrada\" como uma falha. A API externa retorna HTTP 200 com um array de resultados vazio — uma resposta válida. Como você deve reestruturar o resultado da ferramenta?"
+ },
+ "5acee69a7a": {
+  "explanation": "A API do Claude é stateless — não há sessões, nem memória persistente, nem estado interno do modelo entre as chamadas. Cada requisição de API deve incluir o histórico completo da conversa (todas as mensagens anteriores) para que o modelo tenha o contexto do que foi dito anteriormente. Não existe um \"limite de memória padrão\" de dois turnos (B). A ferramenta de verificação (C) não pode limpar o \"estado\" do modelo porque não existe tal estado. As instruções (A) não ajudam se o histórico não estiver sendo passado. ---",
+  "options": {
+   "A": "O prompt carece de instruções dizendo ao Claude para lembrar informações ao longo de múltiplas trocas.",
+   "B": "A retenção de memória do Claude é limitada a dois turnos de conversa por padrão, exigindo configuração explícita para estendê-la.",
+   "C": "A ferramenta de verificação está limpando o estado interno do agente após cada etapa de validação bem-sucedida.",
+   "D": "O histórico da conversa não está sendo passado nas requisições de API subsequentes."
+  },
+  "text": "O agente verifica a identidade do cliente por meio de um processo de várias etapas antes de redefinir senhas. Depois que o cliente responde à terceira pergunta de verificação, o agente pede que ele forneça seu nome novamente, como se a troca anterior nunca tivesse acontecido. Qual é a causa mais provável?"
+ },
+ "5c538bcd9b": {
+  "explanation": "Um escalonamento eficaz dá ao agente humano exatamente o que ele precisa para agir — nem mais, nem menos. Um resumo estruturado (ID do cliente, causa raiz, valor, ação recomendada) é fácil de escanear, acionável e completo. Uma transcrição completa de mais de 25 turnos (A) enterra o sinal em ruído. Trechos brutos das ferramentas (C) exigem que o humano refaça o trabalho de diagnóstico já realizado. Apenas diagnóstico + valor (D) omite o ID do cliente necessário para puxar a conta. Resumos estruturados são o padrão de excelência para repasses de agente para humano. ---",
+  "options": {
+   "A": "A transcrição completa da conversa com todos os resultados das ferramentas.",
+   "B": "Um resumo estruturado: ID do cliente, causa raiz, valor do reembolso e ação recomendada.",
+   "C": "A reclamação original do cliente na íntegra mais trechos dos resultados das ferramentas mostrando as transações duplicadas.",
+   "D": "Apenas o seu diagnóstico e o valor do reembolso."
+  },
+  "text": "Após investigar uma disputa de cobrança ao longo de mais de 25 turnos, você identificou que cobranças duplicadas ocorreram devido a um timeout do gateway de pagamento. O reembolso necessário ($847) excede seu limite de autorização de $500. Você precisa chamar `escalate_to_human`, e o agente humano não terá acesso à transcrição da sua conversa. Que contexto você deve passar?"
+ },
+ "62185891f6": {
+  "explanation": "Por que isto está correto: Superespecificar os prompts do coordenador com instruções procedurais, passo a passo, transforma o subagente em um executor rígido. Se os passos exatos falham, ele chega a um beco sem saída. Fornecer uma intenção de pesquisa, limiares mínimos de qualidade (por exemplo, \"mínimo de 5 afirmações distintas\") e critérios para fontes confiáveis concede ao subagente a autoridade e o contexto para adaptar dinamicamente sua abordagem e formular suas próprias consultas. Por que as outras são mais fracas: - **A)** Reforça a rigidez que está fazendo o agente desistir cedo. - **C)** Ainda é procedural. Você não pode codificar fixamente consultas para padrões emergentes desconhecidos. - **D)** Degrada totalmente a especificidade da pesquisa. ** Lição para a prova:** Substitua instruções procedurais passo a passo por metas de pesquisa e critérios de qualidade para dar aos subagentes a autoridade de adaptar suas abordagens quando os caminhos pré-especificados falharem. ---",
+  "options": {
+   "A": "Adicionar uma instrução de fallback para relatar falha se menos de 5 resultados forem encontrados.",
+   "B": "Substituir as instruções procedurais por prompts orientados a objetivos que detalhem as metas de pesquisa e os critérios de qualidade.",
+   "C": "Expandir as listas de consultas exatas para cobrir tópicos emergentes.",
+   "D": "Fornecer consultas genéricas, de uma única palavra, para ampliar a base de busca."
+  },
+  "text": "Um coordenador fornece consultas de busca exatas, prioridades de fonte e filtros de data passo a passo a um subagente de busca na web. No entanto, o subagente frequentemente relata \"resultados insuficientes\" em vez de tentar alternativas, perde qualidade em tópicos emergentes e raramente traz à tona fontes não convencionais. Qual é a maneira mais eficaz de melhorar a adaptabilidade do subagente?"
+ },
+ "64698822da": {
+  "explanation": "O Claude usa principalmente descrições em linguagem natural para entender quais valores fornecer. Descrições claras e explícitas como \"UUID do usuário a ser atualizado (obrigatório)\" dão ao modelo tanto a expectativa de formato quanto o status obrigatório/opcional de uma forma sobre a qual ele pode agir diretamente. Restrições de JSON Schema (B) ajudam na validação _após_ o fato, mas não informam proativamente ao modelo o que passar. Nomes de parâmetro verbosos (C) são um antipadrão — eles poluem a interface. Respostas de erro (A) só ajudam depois de uma falha, não antes. ---",
+  "options": {
+   "A": "Respostas de erro detalhadas explicando por que os valores de parâmetro inválidos foram rejeitados.",
+   "B": "Restrições estritas de tipo via JSON Schema marcando `user_id` como obrigatório e definindo `fields_to_update` como tipo objeto.",
+   "C": "Nomes de parâmetro verbosos que codificam dicas de formato, como `user_id_string_uuid_format`.",
+   "D": "Descrições de parâmetro claras explicando o formato esperado, como \"user_id: UUID do usuário a ser atualizado (obrigatório)\"."
+  },
+  "text": "Sua ferramenta `update_user_profile` aceita um `user_id` (obrigatório) e um objeto opcional `fields_to_update`. Em testes, o Claude frequentemente omite `user_id` ou passa dados com estrutura incorreta. O que é mais crítico para ajudar o Claude a entender quais valores de parâmetro fornecer?"
+ },
+ "650fd1990f": {
+  "explanation": "Por que isso está correto: o processamento sequencial de trabalho independente e paralelizável é um antipadrão. Em vez de iterar sequencialmente, o coordenador deve emitir todas as 12 chamadas da ferramenta Task em um único turno de resposta. Isso gera 12 subagentes de análise paralelos simultaneamente, reduzindo a latência total da *soma* de todas as tarefas (3+ minutos) para a duração da *tarefa individual mais longa* (~15-20 segundos). Por que as outras são mais fracas: - **A)** Não aborda a arquitetura do loop sequencial. - **C)** `fork_session` é para exploração divergente, não para paralelismo de pipeline. - **D)** A Batch API tem um SLA de até 24 horas, tornando a latência drasticamente pior. ** Conclusão para a prova:** Emita múltiplas chamadas da ferramenta Task em um único turno de resposta do coordenador para alcançar execução paralela e reduzir a latência do pipeline. ---",
+  "options": {
+   "A": "Aumentar a janela de contexto do subagente.",
+   "B": "Fazer o coordenador emitir múltiplas chamadas da ferramenta Task simultaneamente em uma única resposta.",
+   "C": "Usar `fork_session` para acelerar o processamento.",
+   "D": "Usar a Message Batches API."
+  },
+  "text": "Um subagente de análise de documentos processa citações em casos jurídicos complexos de forma sequencial. Um caso emblemático citando 12 precedentes atualmente leva mais de 3 minutos para ser processado. Qual é a forma mais eficaz de reduzir essa latência?"
+ },
+ "6827424889": {
+  "explanation": "Instruções diretas no system prompt especificando frases proibidas são a abordagem padrão e mais sustentável. Elas abordam o problema na origem (comportamento do modelo) em vez de depois do fato (A). A temperatura (D) afeta a aleatoriedade, mas não mira frases específicas. A injeção de turno parcial do assistant (C) é uma técnica válida, mas cria uma estrutura de resposta rígida e precisa de manutenção à medida que os estilos de conversa evoluem. ---",
+  "options": {
+   "A": "Implementar pós-processamento para detectar e remover frases de saudação comuns do início das respostas.",
+   "B": "Adicionar instruções no system prompt especificando frases a evitar, como \"Never begin responses with 'Certainly' or similar affirmations.\"",
+   "C": "Anexar uma mensagem parcial do assistant com uma abertura de resposta direta a partir da qual o modelo continuará.",
+   "D": "Reduzir o parâmetro de temperatura para tornar as aberturas das respostas mais determinísticas e menos variáveis."
+  },
+  "text": "Os usuários relatam que as respostas parecem repetitivas ao longo dos turnos — cada mensagem começa com frases como \"Certainly!\" ou \"I'd be happy to help!\", mesmo já bem avançado nas conversas. Qual é a abordagem mais eficaz?"
+ },
+ "6846603a1e": {
+  "explanation": "Este é o padrão central orquestrador-trabalhador: uma ferramenta trabalhadora lida com a fase custosa de coleta de dados (`discover_and_analyze`), enquanto o orquestrador retém o julgamento editorial sobre quais artigos adicionar. A ferramenta composta elimina mais de 17 chamadas sequenciais de trabalhadores ao mesmo tempo que retorna todas as informações de que o orquestrador precisa para raciocinar entre os candidatos simultaneamente. A opção B remove a autonomia editorial do orquestrador ao fazer a seleção acontecer dentro do trabalhador com \"limiares configuráveis\". A opção A adiciona um overhead de confirmação desnecessário. O cache (D) reduz alguma latência, mas não aborda a quantidade de chamadas sequenciais. ---",
+  "options": {
+   "A": "Adicionar uma ferramenta `preview_curation(topic, collection_id)` que mostra o que seria adicionado com base em regras predefinidas, com uma ferramenta `approve_curation()` para confirmar.",
+   "B": "Criar uma ferramenta `curate_collection(topic, collection_id)` que lida internamente com descoberta, análise e seleção usando limiares de qualidade configuráveis.",
+   "C": "Criar uma ferramenta composta `discover_and_analyze(topic)` que retorna todos os candidatos com suas pontuações de análise, mantendo `add_to_collection` separada para chamadas seletivas.",
+   "D": "Manter todas as ferramentas separadas, mas implementar cache de respostas para as chamadas de `analyze_article`."
+  },
+  "text": "Seu agente de curadoria de conteúdo descobre artigos, analisa cada um quanto à relevância e, em seguida, adiciona os artigos selecionados a coleções temáticas. Com ferramentas separadas `discover_articles(topic)`, `analyze_article(id)` e `add_to_collection(article_id, collection_id)`, você observa mais de 18 chamadas de ferramenta sequenciais por requisição. O agente precisa fazer julgamentos editoriais que requerem ver todos os candidatos com suas pontuações de análise simultaneamente. Qual composição de ferramentas melhor aborda a eficiência ao mesmo tempo que preserva o julgamento editorial?"
+ },
+ "69de18f837": {
+  "explanation": "O schema deve representar a realidade do documento. Contratos com aditamentos genuinamente contêm múltiplas versões de um termo; um campo de valor único não pode representar isso fielmente. Capturar cada valor com sua localização na fonte e data de vigência permite que sistemas a jusante apliquem as regras de precedência corretas com total rastreabilidade. A opção D destrói os termos originais que podem ser juridicamente relevantes. A opção C corre o risco de remover conteúdo que ainda importa. A opção B sinaliza, em vez de resolver, a incompatibilidade fundamental de schema. ---",
+  "options": {
+   "A": "Redesenhar o schema para que os campos aditados capturem múltiplos valores, cada um com sua localização na fonte e data de vigência.",
+   "B": "Implementar validação pós-extração usando correspondência de padrões para detectar aditamentos e sinalizar essas extrações para revisão manual.",
+   "C": "Pré-processar os documentos com um classificador que identifica e remove as seções substituídas antes da etapa principal de extração.",
+   "D": "Adicionar instruções de prompt para sempre extrair o valor do aditamento mais recente e ignorar os termos originais substituídos."
+  },
+  "text": "Seu pipeline de extração processa contratos que frequentemente incluem aditamentos. Quando um contrato contém tanto os termos originais (\"30-day payment\") quanto aditamentos (\"45 days\"), o modelo extrai inconsistentemente um valor ou outro, sem indicação de qual se aplica. Qual é a abordagem mais eficaz?"
+ },
+ "6a558842af": {
+  "explanation": "Um agente humano que assume o caso precisa entender o que aconteceu sem reinvestigar do zero. Um repasse estruturado — dados do cliente, informações do pedido, o que foi encontrado, por que a escalada é necessária — permite uma ação informada imediata. A opção A (transcrição completa + ID de referência) é impraticável se o humano não tiver acesso às ferramentas para recuperar o contexto. A opção B (apenas a mensagem original) descarta todo o trabalho investigativo realizado. A opção C está errada em princípio: tentar ações não autorizadas e contar com o sistema para rejeitá-las não é uma abordagem de segurança válida. ---",
+  "options": {
+   "A": "Persistir todo o histórico da conversa e das respostas de ferramentas em um banco de dados e, em seguida, chamar `escalate_to_human` com um ID de referência.",
+   "B": "Chamar `escalate_to_human` passando apenas a mensagem original do cliente.",
+   "C": "Tentar o reembolso com `process_refund` mesmo assim, escalando apenas se o sistema rejeitar a transação.",
+   "D": "Compilar um repasse estruturado com os dados do cliente, informações do pedido e o problema identificado antes de chamar `escalate_to_human`."
+  },
+  "text": "Seu agente está tratando uma disputa de cobrança. Após chamar `get_customer` e `lookup_order`, ele identifica que a disputa envolve um erro de preço promocional que requer aprovação de gerente — acima do nível de autorização do agente. Como o fluxo de trabalho deve lidar com essa escalada no meio do processo?"
+ },
+ "6e5395d97d": {
+  "explanation": "O cliente fez um pedido inequívoco e explícito por um agente humano — formulado no imperativo (\"I want to talk to a real person NOW\") após expressar frustração contínua. Continuar com perguntas de esclarecimento (B) ou tentar reter o cliente no sistema automatizado (C) ignora sua preferência declarada e aprofunda a frustração. Pausar para executar buscas com ferramentas (D) antes de escalar atrasa o atendimento de um pedido explícito. Quando um cliente pede explícita e enfaticamente um humano, esse pedido deve ser atendido imediatamente. ---",
+  "options": {
+   "A": "Chamar imediatamente `escalate_to_human` com o histórico da conversa.",
+   "B": "Reconhecer a frustração e fazer uma pergunta direcionada para entender o problema específico antes de escalar.",
+   "C": "Explicar brevemente com o que o agente pode ajudar e oferecer-se para resolver o problema rapidamente, escalando apenas se o cliente repetir o pedido.",
+   "D": "Primeiro chamar `get_customer` e `lookup_order` para reunir o contexto da conta, e então escalar para um agente humano."
+  },
+  "text": "Um cliente envia: \"This is frustrating. I've explained my issue twice and nothing is being resolved. I want to talk to a real person NOW.\" O agente ainda não chamou nenhuma ferramenta. O que o agente deve fazer?"
+ },
+ "6f2bcffa03": {
+  "explanation": "A solicitação é genuinamente ambígua no nível da ação (reprodução imediata vs. configuração), e as três interpretações levam a resultados muito diferentes. Uma pergunta de esclarecimento direcionada resolve a ambiguidade com atrito mínimo. Iniciar a configuração (D) presume que o usuário não quer música imediata. Tocar automaticamente (C) faz uma suposição não confirmada. Criar uma playlist (A) presume que ele precisa de uma nova lista em vez de usar uma existente. Crucialmente, B faz _uma_ pergunta — não um interrogatório de várias partes — o que respeita o tempo do usuário e minimiza o risco de abandono. ---",
+  "options": {
+   "A": "Criar uma nova playlist \"Focus\" com faixas selecionadas e notificar o usuário de que está pronta.",
+   "B": "Fazer uma pergunta de esclarecimento sobre o tipo de ação: tocar agora ou configurar para depois.",
+   "C": "Tocar faixas de foco populares imediatamente e deixar o usuário redirecionar se necessário.",
+   "D": "Iniciar a configuração de preferências perguntando sobre gêneros, andamento e artistas que o usuário prefere para foco."
+  },
+  "text": "A primeira mensagem de um novo usuário é \"Set up my focus music.\" Isso pode significar configurar preferências, criar uma playlist ou tocar música imediatamente. Seu sistema suporta todas as três ações. Qual é a abordagem mais eficaz?"
+ },
+ "75230c4d07": {
+  "explanation": "Por que está correto: Descrições de ferramentas e de parâmetros são o *mecanismo primário* que os modelos usam para entender as entradas esperadas, formatos, exemplos e limites. Escrever instruções explícitas em uma propriedade (por exemplo, `\"description\": \"UUID of the user to update (required)\"`) orienta diretamente a geração de tokens do modelo antes da execução da ferramenta. Por que as outras são mais fracas: - **B)** A validação rígida rejeita entradas ruins, mas não diz ao modelo *como* gerar boas entradas em primeiro lugar. - **C)** Uma gambiarra de nomenclatura é muito inferior a descrições adequadas e abrangentes. - **D)** Mensagens de erro reativas desperdiçam turnos de execução em comparação com descrições proativas no schema. ** Lição da prova:** Descrições de parâmetros claras e detalhadas no JSON schema são o mecanismo primário e mais importante para orientar um modelo sobre a formatação de entrada. ---",
+  "options": {
+   "A": "Escrever descrições de parâmetros claras e detalhadas no schema da ferramenta.",
+   "B": "Tornar o JSON schema extremamente rígido com restrições regex complexas.",
+   "C": "Renomear a ferramenta para incluir dicas de formatação no próprio nome dela.",
+   "D": "Adicionar lógica de tratamento de erros que explica as regras de formatação apenas quando a ferramenta falha."
+  },
+  "text": "Durante a execução, um agente tem dificuldade repetida para formatar corretamente as entradas de `user_id` e `fields_to_update` ao chamar uma ferramenta de atualização. Qual é a maneira mais eficaz de ajudar o modelo a entender exatamente quais valores e formatos fornecer?"
+ },
+ "7f6cff4b53": {
+  "explanation": "Por que isto está correto: Como o coordenador já tem as descobertas da pesquisa em seu contexto desde a fase de orquestração, as consultas de resumo de acompanhamento devem ser tratadas pelo próprio coordenador. Subagentes começam do zero e não herdam o histórico de conversa do coordenador. Criar um subagente e passar 80k tokens é um antipadrão quando o coordenador pode fazer o trabalho com seu contexto existente. Por que as outras são mais fracas: - **A)** Ainda cria o subagente desnecessariamente; reduz tokens, mas não corrige a falha arquitetural. - **B)** Não reduz a latência; o gargalo é o processo de criação e transferência de tokens, não os limites de contexto. - **D)** O cache é um paliativo e não corrige o padrão de delegação incorreto. - **E)** `fork_session` destina-se a ramos de exploração divergentes, não à otimização de latência. ** Lição para a prova:** Se o coordenador já tem a informação em seu contexto, trate-a no nível do coordenador — nunca crie um subagente apenas para reprocessar dados que o coordenador já possui. ---",
+  "options": {
+   "A": "Comprimir as descobertas antes de passá-las ao subagente de síntese.",
+   "B": "Aumentar a janela de contexto do subagente de síntese.",
+   "C": "Lidar com o resumo diretamente usando o contexto já existente do coordenador.",
+   "D": "Fazer cache das respostas do subagente de síntese."
+  },
+  "text": "Em um ambiente de produção, consultas de resumo de acompanhamento a um sistema multiagente levam mais de 40 segundos. A investigação mostra que o agente coordenador cria um subagente de síntese para cada requisição de acompanhamento, passando 80000 tokens de descobertas acumuladas. O coordenador já mantém essas descobertas em seu contexto desde a orquestração da pesquisa inicial. Qual é a maneira mais eficaz de melhorar o tempo de resposta para esses resumos de acompanhamento?"
+ },
+ "808dda86d7": {
+  "explanation": "O modelo está alucinando valores para preencher campos anuláveis, provavelmente porque o prompt de extração implicitamente incentiva o preenchimento de valores plausíveis. Uma instrução explícita para retornar `null` quando a informação _não está diretamente declarada_ reformula a tarefa como \"extrair o que está presente\" em vez de \"preencher o formulário.\" Tornar os campos obrigatórios (A) _aumentaria_ a alucinação — sem a opção de null, o modelo precisa inventar valores para todos os campos. Uma chamada de LLM de verificação (D) adiciona um custo significativo para o que é um problema de prompting. ---",
+  "options": {
+   "A": "Tornar todos os campos do schema obrigatórios (não anuláveis) com regras de validação estritas para garantir que o modelo gere apenas dados verificáveis.",
+   "B": "Adicionar instruções de prompt para retornar `null` para qualquer campo cuja informação não esteja diretamente declarada na fonte.",
+   "C": "Atualizar para um nível de modelo mais capaz, com melhor seguimento de instruções, para reduzir as tendências de alucinação.",
+   "D": "Adicionar uma etapa de pós-processamento usando uma segunda chamada de LLM para verificar se cada valor extraído existe no documento de origem."
+  },
+  "text": "Seu sistema extrai metadados de eventos (data, local, organizador, `attendee_count`) de artigos de notícias usando um JSON schema com todos os campos anuláveis. O modelo frequentemente gera valores plausíveis, mas incorretos, para campos não mencionados no artigo — por exemplo, gerando \"500\" para `attendee_count` quando não existem dados de comparecimento. Qual é a maneira mais eficaz de reduzir essas extrações falsas?"
+ },
+ "816ad373d6": {
+  "explanation": "Por que está correto: A questão pede o cronograma que atende ao SLA **enquanto maximiza a eficiência de custos**. A matemática é determinística: - Uma requisição espera no máximo um intervalo de lote antes da submissão - Tempo total no pior caso = intervalo do lote + 24h de tempo máximo de processamento - Para satisfazer o SLA de 30h: intervalo + 24h ≤ 30h → intervalo ≤ 6h Submeter a cada 6 horas é o **maior intervalo que ainda garante a conformidade com o SLA**, ou seja, o menor número de submissões de lotes, a menor sobrecarga de orquestração e a maior eficiência de custos. Ele fica exatamente no limite ótimo. Por que as outras são mais fracas: - **B)** 24h de espera + 24h de processamento = 48 horas, falhando completamente no SLA. - **C)** Sacrifica desnecessariamente o desconto de 50% no custo da Batch API. - **D)** 4h de espera + 24h = 28h. Atende ao SLA, mas submete mais lotes do que o necessário, incorrendo em custo extra de orquestração sem nenhum benefício para o SLA. **⚠️ Nota do Mundo Real:** A opção D (a cada 4 horas) é a escolha de produção **operacionalmente mais segura** — a margem de 2 horas absorve novas tentativas, falhas parciais de lotes e atrasos inesperados, prevenindo violações do SLA. No design de sistemas em produção, nunca opere exatamente no limite de um SLA. No entanto, como a questão pede explicitamente a **máxima eficiência de custos**, A é a resposta correta para o exame. ** Lição do Exame:** Calcule o tempo de resposta no pior caso somando o intervalo do lote ao tempo máximo de processamento de 24h. O cronograma mais eficiente em custos é o *maior intervalo* que ainda satisfaz o SLA — não apenas qualquer intervalo que se encaixe. ---",
+  "options": {
+   "A": "Submeter lotes a cada 6 horas.",
+   "B": "Submeter um único lote grande ao final de cada dia.",
+   "C": "Usar a API síncrona em vez disso para garantir o SLA.",
+   "D": "Submeter lotes a cada 4 horas."
+  },
+  "text": "Seu sistema processa requisições assíncronas de usuários com um Service Level Agreement (SLA) rigoroso que exige resultados em até 30 horas após a submissão. Você planeja usar a Message Batches API, que pode levar até 24 horas para concluir. Qual cronograma de submissão de lotes melhor atende ao SLA enquanto maximiza a eficiência de custos?"
+ },
+ "8f50597c35": {
+  "explanation": "O MCP distingue entre duas camadas de erro. Erros de protocolo JSON-RPC representam falhas _antes_ de a ferramenta executar — um parâmetro obrigatório faltando significa que a própria chamada está malformada e nunca deveria chegar à lógica da ferramenta. Os erros 2 (usuário não encontrado) e 3 (serviço indisponível) ocorrem _durante_ a execução da ferramenta e são resultados semanticamente significativos sobre os quais o orquestrador precisa raciocinar. Retorná-los como resultados de ferramenta com `isError: true` dá ao orquestrador o contexto necessário para decidir os próximos passos (repetir, rotear para um worker diferente, ajustar o relatório). ---",
+  "options": {
+   "A": "Reportar o erro 1 como um erro de protocolo JSON-RPC; reportar os erros 2 e 3 como resultados de ferramenta com `isError: true`.",
+   "B": "Reportar todos os três como resultados de ferramenta com `isError: true`.",
+   "C": "Reportar os erros 1 e 2 como erros de protocolo JSON-RPC; reportar o erro 3 como um resultado de ferramenta com `isError: true`.",
+   "D": "Reportar todos os três como erros de protocolo JSON-RPC."
+  },
+  "text": "Seu servidor MCP implementa uma ferramenta `check_availability` que consulta uma API de calendário externa. Durante os testes, você encontra três condições de erro: (1) a ferramenta é chamada com uma requisição malformada faltando o parâmetro obrigatório `user_email`, (2) a API de calendário retorna um 404 porque o usuário especificado não existe e (3) a API de calendário retorna um 503 porque o serviço está temporariamente indisponível. Como cada erro deve ser reportado de acordo com o design de tratamento de erros do MCP?"
+ },
+ "956cb39c59": {
+  "explanation": "A Message Batches API oferece 50% de economia de custos, mas tem uma janela de processamento de até 24 horas — incompatível com um requisito de alerta de 30 minutos. A arquitetura correta roteia com base no SLA: relatórios padrão obtêm a economia de custos do processamento em batch; relatórios urgentes obtêm as garantias de latência do processamento em tempo real. A opção B não pode garantir um retorno em 30 minutos, já que os resultados de batch podem levar até 24 horas. A opção D abre mão de toda a economia de custos desnecessariamente. ---",
+  "options": {
+   "A": "Enfileirar todos os documentos e submeter batches a cada hora, sinalizando os documentos urgentes para tratamento acelerado quando os resultados do batch retornarem.",
+   "B": "Submeter todos os documentos à Batch API com `custom_ids` para rastreamento. Quando os resultados chegarem, processar imediatamente os documentos urgentes.",
+   "C": "Rotear os relatórios padrão para a Batch API para 50% de economia de custos e rotear os relatórios de exceção urgentes para a Messages API em tempo real.",
+   "D": "Submeter todos os documentos à Messages API em tempo real para garantir uma latência de processamento consistente entre os tipos de documento."
+  },
+  "text": "Seu sistema de extração processa dois tipos de documento: relatórios mensais padrão (arquivados após o processamento) e relatórios de exceção urgentes (que devem disparar alertas de negócio em até 30 minutos). Ambos usam o mesmo JSON schema. Você quer minimizar os custos de API ao mesmo tempo em que atende aos requisitos de latência. Como você deve arquitetar o pipeline?"
+ },
+ "9676e6b8c2": {
+  "explanation": "Todos os três modos de erro decorrem de pedir que o modelo construa um identificador único para uma operação de escrita a partir de entradas ambíguas legíveis por humanos. A correção é separar a consulta da mutação: uma ferramenta `search_games` retorna valores reais de `game_id`; o modelo então passa o ID verificado para `update_game_score`. Esse padrão de \"consultar e depois mutar\" elimina toda a classe de erros de ambiguidade. Restrições (D) ajudam com o formato, mas não resolvem o problema de desambiguação de revanches. Exemplos (C) são a correção mais fraca para um problema estrutural de interface. ---",
+  "options": {
+   "A": "Substituir os três parâmetros por um único parâmetro `game_id` e uma ferramenta de consulta `search_games` separada que retorna os IDs de jogos correspondentes.",
+   "B": "Adicionar um parâmetro `season` para desambiguar revanches e adicionar uma flag `confirm_before_update`.",
+   "C": "Adicionar exemplos detalhados à descrição da ferramenta mostrando o formato de data exigido e a lista completa de nomes oficiais dos times.",
+   "D": "Adicionar restrições de enum listando os nomes válidos de times para ambos os parâmetros de time, e um padrão regex impondo o formato ISO 8601 para o parâmetro de data."
+  },
+  "text": "Seu agente inclui uma ferramenta `update_game_score` que aceita `game_date` (string), `home_team` (string) e `away_team` (string). Os logs de produção revelam problemas recorrentes: apelidos de times em vez de nomes oficiais, formatos de data inconsistentes e o jogo errado selecionado quando os times têm revanches na mesma temporada. Qual mudança na interface da ferramenta preveniria esses erros de forma mais eficaz?"
+ },
+ "98569342e8": {
+  "explanation": "Enums são ideais quando o conjunto válido de valores é pequeno, fixo e conhecido em tempo de design. Eles restringem o modelo a entradas válidas, previnem erros de digitação e tornam a interface autodocumentada. O Claude lida naturalmente com o mapeamento semântico de \"banco de dados de pesquisa\" → `\"research_papers\"`. Strings livres (B, C) introduzem complexidade de validação desnecessária. Pesquisar todos os bancos de dados (D) é desperdício e pode inundar o orquestrador com ruído irrelevante a cada requisição. ---",
+  "options": {
+   "A": "Um parâmetro enum com os valores `[\"research_papers\", \"internal_reports\", \"technical_specs\"]`, exigindo que o modelo mapeie a linguagem natural para o valor apropriado.",
+   "B": "Um parâmetro de string livre com validação em tempo de execução que retorna um erro se o valor não corresponder a um banco de dados conhecido.",
+   "C": "Um parâmetro de string livre em que o backend usa correspondência semântica para determinar qual(is) banco(s) de dados pesquisar.",
+   "D": "Nenhum parâmetro explícito — pesquisar todos os três bancos de dados por padrão e então fazer o modelo filtrar os resultados por origem."
+  },
+  "text": "Sua ferramenta `search_documents` precisa de um parâmetro para especificar qual banco de dados pesquisar. Sua organização tem três bancos de dados de documentos: \"research_papers\", \"internal_reports\" e \"technical_specs\". Os usuários expressam isso naturalmente (\"pesquise o banco de dados de pesquisa\", \"verifique os documentos técnicos\"). Como você deve projetar o parâmetro de seleção do banco de dados?"
+ },
+ "986a65cf13": {
+  "explanation": "Por que está correto: Retornar centenas de registros desperdiça contexto e tempo. O design ideal é retornar apenas a primeira página (por exemplo, 10 registros) junto com metadados como `total_matches` e um `next_cursor`. Isso dá ao agente a consciência situacional para decidir se já tem informação suficiente ou se precisa passar o cursor de volta para a ferramenta de busca para obter a página 2. Por que as outras são mais fracas: - **A)** Truncar resultados silenciosamente esconde informações potencialmente vitais do agente sem aviso. - **C)** Polui o conjunto de ferramentas; a paginação deveria ser um parâmetro da própria ferramenta de busca existente. - **D)** Ainda incentiva buscas internas ocultas e latência de múltiplas páginas. ** Lição da prova:** Retorne a primeira página com a contagem total de correspondências e um cursor; dê ao agente um estado de paginação explícito em vez de incorrer em latência massiva de múltiplas páginas por padrão. ---",
+  "options": {
+   "A": "Silenciosamente limitar os resultados aos 5 hits mais relevantes.",
+   "B": "Retornar a primeira página de resultados junto com metadados de paginação (por exemplo, contagem total, cursor) para que o agente possa buscar mais se necessário.",
+   "C": "Criar uma ferramenta `fetch_next_page` separada para o agente usar.",
+   "D": "Adicionar um parâmetro `max_pages` para deixar o agente decidir quantas páginas buscar internamente."
+  },
+  "text": "Uma ferramenta de busca automaticamente recupera e retorna todos os registros correspondentes de um banco de dados. Isso frequentemente causa latência severa e inchaço de contexto, já que a maioria das tarefas do agente só precisa dos primeiros resultados. Qual é a melhor maneira de redesenhar a saída dessa ferramenta?"
+ },
+ "9b15add885": {
+  "explanation": "Combinar um schema de saída estrito com regras de normalização no nível do prompt produz uma saída consistente em uma única passagem. O modelo lida com a extração _e_ a normalização simultaneamente. A opção B (normalização em pós-processamento) funciona, mas adiciona complexidade ao pipeline e um ponto de falha adicional. Chamadas separadas por campo (C) multiplicam os custos de API e a latência proporcionalmente. Múltiplas tentativas e votação (D) é cara e não aborda o problema raiz de consistência. ---",
+  "options": {
+   "A": "Definir um schema de saída estrito e incluir regras de normalização de formato no seu prompt.",
+   "B": "Extrair os dados como estão e normalizar os formatos no código de pós-processamento depois que o Claude retornar.",
+   "C": "Usar chamadas de extração separadas para cada campo, a fim de garantir o tratamento consistente de cada tipo.",
+   "D": "Solicitar múltiplas tentativas de extração por documento e selecionar o formato mais comum."
+  },
+  "text": "Seu pipeline de extração processa cardápios de restaurantes e deve gerar JSON estruturado com campos para nomes de itens, descrições, preços e tags dietéticas. Alguns cardápios usam formatação inconsistente — preços como \"$12\" vs \"12.00\", informações dietéticas como ícones vs texto. Qual é a abordagem mais confiável?"
+ },
+ "9d57536bdf": {
+  "explanation": "Por que está correto: Forçar um colapso prematuro em um único valor é um antipadrão. Se a tabela de especificações está certa apenas 90% das vezes, codificar de forma fixa uma preferência garante uma taxa de erro de 10%. Modificar o schema para aceitar um array de valores com localizações de origem explícitas preserva a proveniência completa, permitindo que a lógica de negócio posterior ou revisores humanos façam uma reconciliação informada. Por que as outras são mais fracas: - **A)** Impraticável para pipelines automatizados operando sobre documentos legados. - **B)** Um schema de valor único força o LLM a destruir a evidência do conflito. - **C)** Uma regra heurística é frágil e produzirá dados errados 10% das vezes. ** Lição da prova:** Preserve dados de origem conflitantes na saída estruturada em vez de forçar um colapso prematuro em um único valor. ---",
+  "options": {
+   "A": "Interromper o processamento e sinalizar o documento para correção manual antes da extração.",
+   "B": "Usar um schema de valor único e instruir o modelo a escolher o valor mais provavelmente correto.",
+   "C": "Codificar de forma fixa uma regra para sempre extrair o valor da tabela de especificações.",
+   "D": "Alterar o campo para capturar todos os valores conflitantes junto com suas localizações de origem para preservar a proveniência para reconciliação posterior."
+  },
+  "text": "Um pipeline de extração processa manuais técnicos. Um manual específico lista duas capacidades de bateria conflitantes: uma no texto e outra diferente em uma tabela detalhada de especificações. Dados históricos mostram que a tabela de especificações está correta 90% das vezes. Como o schema de extração deve lidar com isso?"
+ },
+ "a29dd8c0f7": {
+  "explanation": "O system prompt é o local designado para instruções persistentes em nível de operador que se aplicam a todos os turnos — análogo ao `CLAUDE.md` no Claude Code, que define o contexto e o comportamento de todo o projeto. As primeiras mensagens do assistant (A) não carregam autoridade em nível de sistema e podem ser sobrepostas por instruções do usuário. Variáveis de ambiente (B) não são um conceito da API do Claude. Prefixar a cada mensagem do usuário (C) é frágil, polui o turno do usuário e mistura instruções do operador e do usuário. ---",
+  "options": {
+   "A": "Na primeira mensagem do assistant, instruindo o Claude a seguir essas diretrizes daí em diante.",
+   "B": "Em variáveis de ambiente que sua aplicação passa ao cliente da API.",
+   "C": "Prefixadas a cada mensagem do usuário antes de enviá-la à API.",
+   "D": "No system prompt."
+  },
+  "text": "Seu assistente de descoberta de música deve manter de forma consistente um tom entusiasmado, explicar seu raciocínio para cada recomendação e fazer perguntas de esclarecimento para entender melhor as preferências do usuário. Você quer que esse comportamento persista de forma confiável em todas as interações com os usuários. Onde você deve definir essas diretrizes de comportamento?"
+ },
+ "a594ff611d": {
+  "explanation": "O agente deve entregar o máximo de valor com as informações que _possui_ (explicação da cobrança, confirmação de elegibilidade) ao mesmo tempo em que é transparente sobre o que _não consegue_ fazer (processar agora devido a um problema de sistema). A confirmação falsa (B) é prejudicial — o reembolso não vai acontecer automaticamente. O escalonamento imediato (D) descarta o valioso trabalho de diagnóstico já concluído. Retries intermináveis (A) criam uma experiência ruim para o usuário durante uma falha transitória de backend. Transparência + resolução parcial + próximos passos claros é o padrão correto para degradação graciosa. --- <a name=\"scenario-2\"></a> ## Cenário 2: Sistema de Pesquisa Multiagente **Contexto:** Você está projetando uma arquitetura orquestrador-trabalhador para pesquisa automatizada e análise de documentos. Um agente orquestrador delega tarefas a agentes trabalhadores especializados equipados com ferramentas MCP para recuperação de dados estruturados, análise de documentos e geração de relatórios. As principais preocupações incluem design confiável de interface de ferramentas, manuseio seguro de parâmetros, taxonomia de erros, eficiência de composição de ferramentas, execução paralela e fronteiras de confiança ao integrar servidores MCP de terceiros. ---",
+  "options": {
+   "A": "Implementar retries automáticos com backoff exponencial para `process_refund`, mantendo a conversa aberta até que o reembolso seja processado com sucesso.",
+   "B": "Confirmar que o reembolso será processado e encerrar a conversa, já que o sistema tem todas as informações necessárias para completá-lo automaticamente.",
+   "C": "Explicar a cobrança, confirmar a elegibilidade do reembolso, reconhecer o problema do sistema que impede o processamento imediato e oferecer escalonamento ou nova tentativa mais tarde.",
+   "D": "Escalar imediatamente para um agente humano, já que a ação de reembolso não pode ser concluída."
+  },
+  "text": "Durante a resolução de uma disputa de cobrança, seu agente recupera com sucesso as informações do cliente via `get_customer` e os detalhes do pedido via `lookup_order`, mas `process_refund` retorna um erro de timeout. O agente consegue explicar as cobranças e verificar a elegibilidade do reembolso, mas não consegue processar o reembolso. Qual abordagem melhor equilibra a resolução no primeiro contato com o tratamento de erros apropriado?"
+ },
+ "ab36cbad5b": {
+  "explanation": "Por que está correto: Forçar o agente a orquestrar uma busca puramente mecânica de ID para string desperdiça tokens, adiciona um ponto de falha e aumenta a latência. Se `get_neighborhood_info` frequentemente segue logicamente a identificação da propriedade, atualizar sua interface para aceitar o `property_id` e tratar a busca do endereço internamente abstrai a complexidade para longe do LLM. Por que as outras são mais fracas: - **A)** Consolida demais; dados de bairro e dados de propriedade ainda são capacidades distintas. - **C)** Melhorias no prompt não corrigem a latência arquitetural de chamadas de ferramenta sequenciais. - **D)** Adiciona mais superfície e preserva a falha de encadeamento. ** Lição da prova:** Projete ferramentas para internalizar dependências previsíveis (como buscas de ID) para reduzir encadeamento evitável, latência e acoplamento de falhas. ---",
+  "options": {
+   "A": "Mesclar ambas as ferramentas em uma única ferramenta `get_all_property_data`.",
+   "B": "Modificar `get_neighborhood_info` para aceitar `property_id` diretamente e resolver o endereço internamente.",
+   "C": "Melhorar o prompt para garantir que o agente extraia o endereço de forma mais confiável.",
+   "D": "Criar uma ferramenta auxiliar de camada intermediária para gerenciar o repasse de dados."
+  },
+  "text": "Um agente frequentemente executa uma sequência de dois passos: ele chama `get_property_details(property_id)` para encontrar um endereço, depois passa esse endereço para `get_neighborhood_info(address)`. Esse encadeamento aumenta a latência e as taxas de falha. Como o design da ferramenta deve ser melhorado?"
+ },
+ "b197840e72": {
+  "explanation": "Por que está correto: Os limites de contexto são absolutos. Se você tem um limite de 200k, mas 2.500 tokens são ocupados pelo schema da ferramenta e 1.500 pelo system prompt, o seu espaço *efetivo* de documento é de ~196k. À medida que os tokens do documento se aproximam de 180k+, o payload total chega perto da borda do limite de contexto. Os modelos sofrem degradação de atenção (e não apenas cortes abruptos) perto do limite absoluto, o que se manifesta especificamente como o \"terço final consistentemente ausente\". Por que as outras são mais fracas: - **B)** A complexidade do schema causa erros semânticos (valores errados), não omissão posicional. A acurácia é de 98% em documentos curtos com o mesmo schema. - **C)** O \"perdido no meio\" afeta o meio, enquanto o sintoma aqui aponta especificamente o *terço final* ausente. - **D)** Atenção proporcional é um conceito fabricado. ** Lição da prova:** Schemas de ferramenta e system prompts grandes consomem o seu orçamento de contexto; documentos longos perto do limite absoluto sofrerão degradação de atenção no final do prompt. Reduza os schemas ou divida os documentos em chunks. ---",
+  "options": {
+   "A": "A definição da ferramenta consome tokens de entrada e, combinada com os system prompts, empurra o total de entrada para perto do limite de contexto, degradando a atenção para o conteúdo no final.",
+   "B": "Schemas que excedem 8-10 campos intrinsecamente aumentam a complexidade de decisão.",
+   "C": "Documentos muito longos excedem a capacidade efetiva de atenção do modelo, causando degradação no meio do documento.",
+   "D": "O modelo distribui a atenção proporcionalmente, fazendo com que o final do documento receba foco insuficiente."
+  },
+  "text": "Um sistema de extração usa um JSON schema de 12 campos e descrições de ferramentas detalhadas totalizando ~2.500 tokens. Para documentos com menos de 150k tokens, a acurácia é de 98%. No entanto, para documentos entre 175k-185k tokens, a acurácia cai para 71%, com informações do terço final do documento consistentemente ausentes. A janela de contexto do modelo é de 200k tokens. Qual é a causa mais provável dessa degradação?"
+ },
+ "b291a2bf1d": {
+  "explanation": "Por que está correto: Atributos em linguagem natural (como datas e nomes de times) são inerentemente ambíguos e frágeis quando usados como chaves de banco de dados. A correção arquitetural é separar a descoberta da ação. Use uma ferramenta de busca (`search_games`) que retorna um identificador utilizável por máquina (`game_id`), e force a ferramenta mutadora (`update_score`) a depender exclusivamente desse identificador estrito. Por que as outras são mais fracas: - **A)** Não resolve revanches, e os LLMs ainda têm dificuldade com a formulação manual estrita de texto. - **B)** Documentação não elimina a ambiguidade de entrada. - **C)** A validação detecta erros, mas não ajuda o agente a resolver o jogo subjacente correto. ** Lição da prova:** Substitua ferramentas que dependem de campos de texto ambíguos inseridos por humanos por um padrão de busca/ação em dois passos que utiliza identificadores estritos utilizáveis por máquina (`IDs`). ---",
+  "options": {
+   "A": "Exigir formatos de data estritamente ISO-8601 e nomes completos oficiais dos times no schema da ferramenta.",
+   "B": "Melhorar a descrição da ferramenta para fornecer exemplos de formatação correta.",
+   "C": "Adicionar validação regex aos parâmetros da ferramenta para detectar erros de formatação cedo.",
+   "D": "Introduzir uma ferramenta `search_games` que retorna um `game_id`, e atualizar a ferramenta de placar para aceitar apenas o `game_id`."
+  },
+  "text": "Um agente atualiza placares esportivos usando uma ferramenta `update_game_score(date, team_name)`. A ferramenta falha frequentemente devido a apelidos de times ambíguos, partidas de revanche no mesmo dia e variações no formato de data. Qual é o design de ferramenta mais confiável para corrigir isso?"
+ },
+ "b3de307bcf": {
+  "explanation": "O prompt caching foi projetado para este caso de uso: um system prompt fixo repetido em muitas requisições. Os tokens em cache são cobrados a taxas significativamente reduzidas em comparação com os tokens de entrada não armazenados em cache, quando as leituras de cache se aplicam. As Message Batches suportam prompt caching, mas como as requisições de batch são processadas de forma assíncrona e concorrente, os acertos de cache são best-effort — inclua blocos `cache_control` idênticos e siga as orientações da Anthropic sobre batch + caching para maximizar as taxas de acerto. Com um system prompt de 1.800 tokens em 8.000 requisições diárias, a reutilização bem-sucedida do cache pode reduzir muito o gasto com tokens de entrada a preço cheio em comparação com não usar caching. A opção A (batching de múltiplos documentos por chamada) reduz a contagem de requisições, mas complica a análise das respostas e não reduz o custo de tokens por documento. A opção C (prompt mais curto) corre o risco de degradar a qualidade da extração — as regras de normalização e a documentação do schema estão fazendo um trabalho real. A opção D aborda o overhead de API por batch, que não é o custo dominante neste cenário; o custo dos tokens é. ---",
+  "options": {
+   "A": "Mudar para um modelo com uma janela de contexto maior para processar múltiplas listagens de produtos em uma única chamada de API, reduzindo o número de requisições.",
+   "B": "Habilitar prompt caching no system prompt para que seus tokens sejam cobrados à taxa reduzida de leitura de cache em requisições repetidas dentro do mesmo batch.",
+   "C": "Encurtar o system prompt removendo as regras de normalização e a documentação do schema, contando com a capacidade básica de seguimento de instruções do modelo.",
+   "D": "Submeter os documentos em batches menos numerosos e maiores para amortizar o overhead fixo por batch entre mais documentos."
+  },
+  "text": "Seu pipeline processa 8.000 listagens de produtos diariamente usando a Message Batches API. Cada requisição usa o mesmo system prompt de 1.800 tokens (definição do JSON schema + instruções de extração + regras de normalização) juntamente com o conteúdo variável da descrição do produto. Sem otimização, os custos de tokens de entrada dominam sua fatura mensal. Qual abordagem reduz mais efetivamente os custos de tokens de entrada para essa carga de trabalho?"
+ },
+ "b3f96bc34e": {
+  "explanation": "Trabalhe de trás para frente a partir do SLA: prazo de 30 horas = tempo de espera do lote + tempo de processamento. Com até 24 horas de processamento, você tem no máximo 6 horas de orçamento para tempo de espera. Com lotes de 6 horas (D): espera máxima = 6h + 24h = **exatamente 30h** — zero margem, tornando impossível atingir 99,9% de confiabilidade. Com lotes de 4 horas (C): espera máxima = 4h + 24h = **28h** — uma margem de 2 horas que sustenta 99,9% de confiabilidade. O batching no fim do dia (B) viola o SLA para documentos do início do dia. A API em tempo real (A) abre mão da economia de 50% de custo. ---",
+  "options": {
+   "A": "Usar a API em tempo real para todos os documentos em vez de processamento em lote.",
+   "B": "Enviar um único lote no fim do dia contendo todos os documentos daquele dia.",
+   "C": "Enviar lotes a cada 4 horas contendo os documentos daquela janela.",
+   "D": "Enviar lotes a cada 6 horas contendo os documentos daquela janela."
+  },
+  "text": "Documentos chegam continuamente ao longo do horário comercial e precisam ter dados estruturados extraídos. Para reduzir custos, você quer usar a Message Batches API (50% de desconto, janela de processamento de até 24 horas). Seu SLA especifica que os resultados da extração devem estar disponíveis em até 30 horas após a chegada do documento, com 99,9% de confiabilidade. Qual estratégia de batching é a mais apropriada?"
+ },
+ "b665fcd232": {
+  "explanation": "Quando você tem uma prioridade de origem conhecida (a tabela de especificações é mais precisa 90% das vezes), codifique essa preferência como uma instrução de extração. Essa é uma correção simples e econômica que mantém um schema limpo de valor único. A opção A adiciona complexidade de schema para os consumidores downstream que só querem o valor correto. A opção B aciona revisão manual mas não resolve o conflito. A opção C exige correção manual de 15% dos documentos. Sempre use conhecimento de domínio nas instruções de extração antes de complicar o schema. ---",
+  "options": {
+   "A": "Mudar para um campo de array que captura todos os valores encontrados junto com suas localizações de origem, deixando os sistemas downstream aplicarem regras de precedência.",
+   "B": "Adicionar um campo booleano `conflict_detected` que sinaliza inconsistências, acionando revisão manual para os documentos afetados.",
+   "C": "Implementar validação de schema que rejeita resultados contendo valores conflitantes, exigindo correção do documento de origem antes do processamento.",
+   "D": "Incluir instruções de extração especificando preferir os valores da tabela detalhada de especificações quando houver múltiplos valores, mantendo o schema de valor único."
+  },
+  "text": "Especificações às vezes entram em conflito dentro dos documentos de origem. Uma seção de resumo afirma \"Battery: 4000mAh\" enquanto a tabela detalhada de especificações mostra \"Battery: 4200mAh.\" Seu schema atual usa um único campo `battery_capacity_mah`. Essa inconsistência ocorre em ~15% dos documentos; a tabela detalhada de especificações é mais precisa 90% das vezes. Qual é a abordagem mais eficaz?"
+ },
+ "bbb075dcfb": {
+  "explanation": "A API do Claude é stateless — não há sessões, nem memória persistente, nem banco de dados vetorial embutido. Cada chamada de API é completamente independente. Para manter o contexto da conversa, sua aplicação deve incluir todos os turnos anteriores no array `messages` a cada requisição. O histórico da conversa não é armazenado do lado da Anthropic entre as chamadas. Este é o erro de integração mais comum ao construir aplicações conversacionais sobre o Claude. ---",
+  "options": {
+   "A": "A janela de contexto do modelo foi excedida pelo comprimento da conversa.",
+   "B": "A API do Claude requer um parâmetro `session_id` que você não configurou.",
+   "C": "Sua aplicação não está incluindo as mensagens anteriores no array `messages`.",
+   "D": "O Claude requer uma conexão com banco de dados vetorial para manter a memória da conversa."
+  },
+  "text": "Você está implementando um recurso em que os usuários refinam suas preferências de playlist ao longo de múltiplos turnos de conversa. Após implantar, você percebe que as respostas do Claude não refletem o que os usuários disseram antes na mesma conversa — um usuário diz que adora jazz, mas duas mensagens depois o Claude pergunta de quais gêneros ele gosta. Qual é a causa mais provável?"
+ },
+ "bbe160f9ce": {
+  "explanation": "A percepção-chave é investir antecipadamente na otimização de prompts usando uma pequena amostra em tempo real e, então, processar em lote o corpus completo uma única vez com prompts otimizados. Isso antecipa o aprendizado, minimiza o volume processado com prompts subótimos e usa o processamento em lote para o grosso do trabalho (50% de economia de custo). A opção A envia 50.000 com taxa de falha de 18% e depois itera de forma cara. A opção B duplica o custo desnecessariamente. A opção D processa ~35.000 documentos antes de aprender plenamente com os padrões de falha. ---",
+  "options": {
+   "A": "Enviar todos os 50.000 via batch API e, em seguida, enviar as extrações que falharam em lotes sucessivos — refinando os prompts entre cada lote.",
+   "B": "Usar a API em tempo real para todos os 50.000 documentos, já que a janela de 24 horas da batch API cria um risco inaceitável para o prazo.",
+   "C": "Processar 2.000 documentos de amostra via API em tempo real para identificar padrões de falha e refinar os prompts e, então, processar em lote todos os 50.000 com os prompts otimizados.",
+   "D": "Dividir em 10 lotes sequenciais de 5.000 cada, analisando os resultados e refinando os prompts entre os lotes."
+  },
+  "text": "Sua equipe está extraindo dados estruturados de 50.000 contratos jurídicos legados sob um prazo de duas semanas. Os testes iniciais em 500 amostras mostram que 82% passam na validação do JSON schema na primeira tentativa; os 18% restantes falham por questões diversas que exigem 2-3 refinamentos de prompt. Qual estratégia de processamento em lote é a mais eficiente em custo, ao mesmo tempo em que cumpre o prazo?"
+ },
+ "be59ccc543": {
+  "explanation": "Por que está correto: Fluxos de trabalho de múltiplos passos exigem contratos claros de entrada/saída. Como as ferramentas posteriores (`share`, `move`) exigem um identificador específico utilizável por máquina (`document_id`), a ferramenta `search` anterior deve retornar exatamente esse ID em um formato estruturado, junto com os metadados legíveis por humanos. Por que as outras são mais fracas: - **A)** URLs clicáveis são para humanos. O agente teria que inferir ou fazer parsing dos IDs a partir da string. - **C)** Resumos em prosa não fornecem os identificadores programáticos exatos necessários para a próxima chamada de API. - **D)** Títulos são ambíguos e não podem ser passados diretamente para uma API baseada em ID. ** Lição da prova:** Fluxos de trabalho de ferramentas de múltiplos passos exigem identificadores utilizáveis por máquina; ferramentas destinadas a encadeamento devem sempre retornar dados estruturados contendo IDs explícitos. ---",
+  "options": {
+   "A": "Retornar URLs clicáveis e legíveis por humanos.",
+   "B": "Retornar dados estruturados contendo `document_id` e metadados para cada resultado.",
+   "C": "Retornar resumos detalhados em prosa do conteúdo dos documentos.",
+   "D": "Retornar uma lista simples de títulos de documentos."
+  },
+  "text": "Um agente usa uma ferramenta `search_documents` para encontrar arquivos e, em seguida, usa `share_document(document_id, email)` e `move_document(document_id, folder)` para agir sobre eles. Como a ferramenta `search_documents` deve formatar sua saída para garantir um encadeamento confiável?"
+ },
+ "c13a87d6fd": {
+  "explanation": "Por que está correto: Expor mais de 50 ferramentas simultaneamente degrada a acurácia de tomada de decisão do modelo (complexidade de decisão). A correção arquitetural é impor escopo dinâmico: o agente primeiro chama `search_connectors`, e o sistema responde injetando *apenas* as 2-3 ferramentas de conector correspondentes e altamente relevantes no contexto do agente para o próximo turno. Por que as outras são mais fracas: - **A)** Descrições melhores ajudam, mas mais de 50 ferramentas ativas ainda causam sobrecarga cognitiva sistêmica. - **B)** Uma API monolítica remove a capacidade do agente de inspecionar os requisitos de parâmetros e escolher corretamente entre variantes sutis. - **C)** O tratamento de erros é um remendo reativo; o escopo dinâmico previne o erro de forma proativa. ** Lição da prova:** Reduza a complexidade de decisão expondo dinamicamente ao agente apenas as ferramentas relevantes, em vez de despejar mais de 50 ferramentas na janela de contexto simultaneamente. ---",
+  "options": {
+   "A": "Reescrever as descrições de ferramentas dos 50 conectores para serem mais detalhadas.",
+   "B": "Combinar todos os 50 conectores em uma única chamada de API monolítica.",
+   "C": "Implementar um tratamento de erros melhor para que o agente possa se recuperar após selecionar o conector errado.",
+   "D": "Fornecer uma ferramenta `search_connectors` que escopa dinamicamente o conjunto de ferramentas disponível, expondo ao agente apenas os conectores relevantes correspondentes."
+  },
+  "text": "Um agente tem acesso a mais de 50 ferramentas de conector de API diferentes. Durante a execução, ele frequentemente seleciona o conector errado, mesmo quando explicitamente instruído a buscar primeiro. Qual é a mudança arquitetural mais eficaz para corrigir essa falha de seleção de ferramenta?"
+ },
+ "c39de30c6c": {
+  "explanation": "Diferentemente da Questão 6 (uma exigência inequívoca e enfática), este cliente está expressando frustração e uma preferência — não uma ordem absoluta. Ele quer o _problema resolvido_, e o agente _pode_ resolvê-lo agora mesmo. A resposta certa é reconhecer sua frustração, fornecer nova informação (\"isso na verdade é resolvível agora mesmo\") e dar-lhe a escolha. Processar sem perguntar (D) ignora a preferência declarada. Escalar imediatamente (B) ignora que o agente pode resolver totalmente o problema. Mais perguntas (A) adiciona justamente o atrito do qual ele está reclamando. ---",
+  "options": {
+   "A": "Perguntar o que especificamente não funcionou nas tentativas anteriores antes de decidir se deve escalar ou resolver automaticamente.",
+   "B": "Chamar `escalate_to_human` imediatamente para atender ao pedido do cliente.",
+   "C": "Reconhecer a frustração, informar que isso é resolvível agora e oferecer-se para concluir ou escalar.",
+   "D": "Processar o reembolso via `process_refund` para resolver o problema subjacente e então informar que está concluído."
+  },
+  "text": "Um cliente escreve: \"Estou indo e voltando com essa devolução há dias. Eu só quero falar com alguém que realmente possa me ajudar.\" O agente confirmou via `lookup_order` que a devolução está dentro da política e elegível para processamento imediato. O que o agente deve fazer?"
+ },
+ "c8c068bff6": {
+  "explanation": "Por que está correto: Quando as ferramentas têm dependências estritas (um DOI deve existir antes que as citações possam ser consultadas), você precisa impor um portão de pré-requisito determinístico. Definir `tool_choice: {\"type\": \"tool\", \"name\": \"extract_metadata\"}` força explicitamente o modelo a executar essa ferramenta no Turno 1. Uma vez que o DOI é retornado ao contexto, você muda para `\"auto\"` no Turno 2 para que o modelo possa usar livremente as ferramentas de enriquecimento. Por que as outras são mais fracas: - **A)** Instruções de prompt têm uma taxa de falha diferente de zero. Prompting probabilístico é inferior a restrições determinísticas de API. - **C)** Diminui a componibilidade e aumenta massivamente a complexidade da ferramenta. - **D)** Sob `\"auto\"`, o modelo lê a requisição completa do usuário e pode ainda tentar a segunda etapa em paralelo. ** Lição do Exame:** Quando uma ordem de execução determinística é exigida para dependências de ferramentas, use `tool_choice` forçado no primeiro turno e então libere para `\"auto\"` nos turnos subsequentes. --- ## Resumo de Conceitos-Chave * **Aplicação por Ferramenta vs. por Prompt:** Sempre prefira aplicar regras, ordens de execução (`tool_choice`) e limites de lógica de negócio dentro do schema ou da ferramenta de backend em si, em vez de depender de instruções de prompt. * **Orçamento de Contexto:** Previna efeitos de \"perdido no meio\" aparando agressivamente o conteúdo bruto e as cadeias de raciocínio intermediárias antes das transferências subsequentes. * **Dados Estruturados em vez de Prosa:** A prosa colapsa metadados. Sempre use saídas JSON estruturadas para preservar a atribuição (via IDs, datas, URLs explícitos) através de pipelines multiagente. * **Otimização da Batch API:** Para economizar custos, fragmente e reenvie *apenas os documentos que falharam* (usando `custom_id`), submeta lotes com base na matemática estrita do SLA + margem, e refine seus prompts em amostras pequenas *antes* da execução em lote em larga escala. * **Interfaces de Ferramentas:** Reduza a adivinhação do agente. Use enums para categorias delimitadas, exija que os sistemas de backend lidem com a consulta de ID para string, e sempre forneça controles explícitos de paginação em vez de despejar conjuntos de dados massivos. * **Recuperação de Sessão:** Nunca use `--resume` cegamente após uma falha. Extraia um checkpoint estruturado do trabalho concluído, injete-o em uma *nova* sessão e diga ao agente exatamente onde começar. * **Descrições de Schema:** As descrições de ferramentas e parâmetros no schema são o *mecanismo primário* que um LLM usa para saber quando usar uma ferramenta e como formatar suas entradas. ## Dicas de um Examinando Real *\"Escolhi as respostas mais intuitivas com base na minha experiência atual construindo Agentes de IA e sistemas de AI Harnessing, além de experimentar rodar o claude code com LLMs locais etc.* *Foi uma prova complicada. Para a maioria das questões de múltipla escolha, várias opções podiam tecnicamente resolver o problema da questão, mas o verdadeiro desafio era escolher a solução que segue as melhores práticas. E é aqui que a experiência em engenharia de software ajuda.* *O exame testa sua proficiência em IA, ética em IA, design de sistemas e pensamento crítico, e a mentalidade de experiência do usuário.\"* Com base nessas reflexões e nos padrões do exame, tenha em mente estas estratégias táticas ao fazer a prova: 1. **Sempre procure a correção estrutural.** As respostas erradas frequentemente apresentam \"melhore o prompt\" ou \"diga ao agente para não fazer isso\". As respostas corretas quase sempre apresentam mudanças estruturais na API, `tool_choice`, parâmetros `enum` e flags JSON estruturadas. 2. **Cuidado com o excesso de geração de subagentes.** Se um coordenador já mantém o contexto, gerar um subagente está errado. Subagentes servem para exploração nova, não para reprocessar dados existentes. 3. **Identificadores de máquina prevalecem.** Se um agente precisa executar uma ação sobre um item específico (um documento, um jogo, um usuário), a arquitetura correta sempre usa um ID explícito (`game_id`, `citation_id`), nunca uma string de texto ambígua. 4. **Assuma que metadados autorreportados não são confiáveis.** Especialmente para servidores MCP, as flags `readOnly` são apenas sugestões. Baseie os bypasses de segurança na confiança em nível de sistema, não em anotações de ferramentas. Precisa dessas questões em uma visualização de flash card ou quiz? Experimente [https://ericspencer.us/Claude-architect-quiz/](https://ericspencer.us/Claude-architect-quiz/)",
+  "options": {
+   "A": "Adicionar uma instrução no prompt para \"sempre chamar extract_metadata primeiro\".",
+   "B": "Definir `tool_choice` para forçar estritamente a ferramenta `extract_metadata` no primeiro turno e então usar `tool_choice: \"auto\"` nos turnos subsequentes.",
+   "C": "Combinar todas as três ferramentas em uma única ferramenta gigante.",
+   "D": "Usar `tool_choice: \"auto\"` mas restringir as descrições das ferramentas de enriquecimento."
+  },
+  "text": "Um pipeline usa uma ferramenta `extract_metadata` que retorna um DOI. Ele também tem ferramentas de enriquecimento `lookup_citations` e `verify_doi` que *exigem* um DOI para funcionar. Quando os usuários pedem para \"extrair os metadados e me dizer o quanto está citado\", o modelo às vezes chama as ferramentas de enriquecimento primeiro, que falham porque não têm o DOI. Qual é a maneira mais eficaz de garantir que a extração estruturada de metadados aconteça primeiro?"
+ },
+ "ca1838c6cf": {
+  "explanation": "Cada operação tem um conjunto de parâmetros distinto. Ao compartilhar uma única ferramenta, o modelo deve inferir quais parâmetros se aplicam com base no tipo de operação — uma tarefa cognitivamente complexa e propensa a erros. Dividir em ferramentas separadas torna cada interface inequívoca: o modelo seleciona a ferramenta correta com base na intenção, e os parâmetros dessa ferramenta são sempre relevantes. Este é o princípio \"uma ferramenta, um trabalho\". Condicionais do JSON Schema (B) são complexas de criar e manter; exemplos few-shot (D) adicionam sobrecarga de prompting sem corrigir o problema estrutural. ---",
+  "options": {
+   "A": "Dividir em três ferramentas separadas (`issue_refund`, `cancel_order`, `request_reshipment`), cada uma definindo apenas os parâmetros necessários para aquela operação específica.",
+   "B": "Manter uma ferramenta unificada, mas adicionar condicionais `if-then-else` do JSON Schema para impor que parâmetros como `amount` sejam obrigatórios apenas quando o tipo de operação for \"refund\".",
+   "C": "Manter uma ferramenta unificada com um parâmetro de objeto `operation_details` aninhado cuja estrutura interna varia conforme o tipo de operação, documentado na descrição da ferramenta.",
+   "D": "Manter uma ferramenta unificada com todos os parâmetros marcados como opcionais, mas adicionar exemplos few-shot detalhados no system prompt mostrando combinações corretas de parâmetros."
+  },
+  "text": "Seu sistema de gestão de pedidos requer ferramentas para três operações distintas: emitir reembolsos (requer valor e motivo), cancelar pedidos (requer motivo) e solicitar reenvios (requer endereço de entrega). Cada uma compartilha um parâmetro `order_id`, mas tem requisitos adicionais diferentes. O agente frequentemente omite parâmetros obrigatórios ou inclui parâmetros irrelevantes. Qual mudança de design melhorará mais efetivamente a acurácia dos parâmetros?"
+ },
+ "cb710d580e": {
+  "explanation": "A API do Claude é stateless — toda requisição inclui o histórico completo da conversa. À medida que a conversa cresce, cada requisição envia mais tokens de entrada. Mais tokens de entrada = custo mais alto e latência mais alta, já que o tempo de processamento escala com o tamanho da entrada. Não há latência de banco de dados na API padrão (B). Não há um perfil de usuário persistente sendo construído entre as chamadas (C). O comprimento da resposta não está inerentemente ligado ao comprimento do contexto (D). ---",
+  "options": {
+   "A": "Todo o histórico da conversa é incluído em cada requisição de API, então os tokens de entrada crescem a cada turno.",
+   "B": "As operações de banco de dados para recuperar e armazenar o histórico da conversa ficam mais lentas à medida que a tabela cresce.",
+   "C": "O modelo constrói um perfil interno dos padrões de conversa do usuário, exigindo mais processamento à medida que o perfil cresce.",
+   "D": "O modelo gera respostas progressivamente mais longas à medida que acumula mais contexto para referenciar."
+  },
+  "text": "Os usuários relatam que a latência da API aumenta perceptivelmente e os custos sobem à medida que as conversas de prática se estendem além de 50+ turnos. Qual é a causa PRIMÁRIA desse comportamento?"
+ },
+ "cb8d6d1d0b": {
+  "explanation": "O resumo progressivo equilibra dois requisitos: preservar a _substância_ das sessões anteriores (conclusões, decisões e temas específicos) enquanto gerencia a contagem de tokens. Os resumos são estruturados para _extrair explicitamente_ as conclusões-chave — não perdê-las na compressão. A janela móvel (D) descartaria as conclusões anteriores sobre as quais os usuários estão perguntando. As tags XML (B) não reduzem a contagem de tokens. A recuperação semântica (C) fragmenta a linha narrativa importante para construir sobre discussões passadas. ---",
+  "options": {
+   "A": "Implementar resumo progressivo em que blocos mais antigos da conversa são substituídos por resumos concisos que extraem explicitamente conclusões-chave, decisões e temas recorrentes, mantendo as trocas recentes literalmente.",
+   "B": "Adicionar tags XML estruturadas para marcar conclusões significativas de discussão ao longo do histórico da conversa.",
+   "C": "Usar embedding semântico para indexar todo o histórico da conversa e recuperar apenas as trocas passadas relevantes para cada consulta do usuário, substituindo o formato de conversa linear por trechos recuperados.",
+   "D": "Implementar truncamento por janela móvel para manter apenas os 25.000 tokens mais recentes."
+  },
+  "text": "Após três meses de sessões semanais, seu histórico de conversa cresceu para 85.000 tokens. Quando os usuários perguntam \"What did we conclude about the theme of isolation?\", o assistente fornece uma análise genérica em vez de referenciar os insights específicos do grupo de sessões anteriores. As discussões se constroem sobre as conclusões das reuniões anteriores. Qual é a abordagem mais eficaz?"
+ },
+ "ce0c910ed1": {
+  "explanation": "Em um sistema multiagente que usa servidores MCP de terceiros, as anotações de ferramentas são metadados autorreportados — um servidor malicioso ou mal implementado poderia anotar uma ferramenta destrutiva como `readOnlyHint: true`. A confiança deve se basear na sua avaliação independente da confiabilidade do servidor, não em alegações que o servidor faz sobre si mesmo. Este é um princípio de segurança central em arquiteturas multiagente: agentes e ferramentas externos devem receber apenas a confiança justificada por sua procedência real, não por suas capacidades autodeclaradas. ---",
+  "options": {
+   "A": "Tratar as anotações de ferramentas como metadados não confiáveis, a menos que o próprio servidor seja confiável. Basear os requisitos de confirmação na sua avaliação da confiabilidade de cada fornecedor, não nas anotações que eles próprios reportam.",
+   "B": "Servidores MCP rodam como processos locais, então as ferramentas de qualquer conexão devidamente inicializada herdam o contexto de segurança da sua aplicação e podem ser confiáveis independentemente do fornecedor.",
+   "C": "Anotações de somente leitura indicam o comportamento pretendido e são confiáveis para ferramentas que fazem requisições GET a APIs externas. Pule a confirmação para ferramentas de busca de dados de servidores devidamente conectados.",
+   "D": "Implementar uma camada de verificação que testa o comportamento real de cada ferramenta antes de adicioná-la a uma allowlist. Pule a confirmação apenas para ferramentas validadas por meio de testes comportamentais."
+  },
+  "text": "Seu agente de marketing se conecta a servidores MCP de três fornecedores diferentes: um serviço de e-mail, uma plataforma de mídia social e um dashboard de analytics. Cada servidor fornece anotações de ferramentas — algumas ferramentas marcadas com `readOnlyHint: true`, outras com `destructiveHint: true`. Sua equipe propõe ignorar automaticamente os prompts de confirmação para ferramentas anotadas como somente leitura. O que deve orientar essa decisão?"
+ },
+ "cfbebfba23": {
+  "explanation": "Ferramentas de trabalho (worker) devem fornecer um sinal preciso sobre o que aconteceu. Retornar um resultado vazio (B) é uma mentira — o orquestrador concluirá incorretamente que não há voos, e não que a busca falhou. Engolir o erro silenciosamente (D) esconde problemas do orquestrador por completo. Repetir 5 vezes (A) cria latência inaceitável — um design melhor deixa o orquestrador decidir a estratégia de repetição com base no contexto. Retornar um resultado de erro claro e honesto permite que o orquestrador informe as etapas subsequentes, tente fontes alternativas ou notifique o usuário. ---",
+  "options": {
+   "A": "Repetir automaticamente a requisição até cinco vezes com backoff exponencial antes de retornar os resultados ao agente.",
+   "B": "Retornar uma lista de voos vazia como se a busca tivesse tido sucesso, mas não encontrado nenhum voo correspondente.",
+   "C": "Retornar uma mensagem de erro no resultado da ferramenta explicando que o serviço está temporariamente indisponível.",
+   "D": "Registrar o erro internamente e retornar uma resposta vazia, deixando o modelo continuar sem os dados de voo."
+  },
+  "text": "Sua ferramenta `search_flights` chama uma API externa de companhia aérea que ocasionalmente retorna um erro 503 Service Unavailable. Qual é a maneira mais eficaz de lidar com esse erro na implementação da sua ferramenta?"
+ },
+ "d5e09ba10f": {
+  "explanation": "O orquestrador está calibrando incorretamente quando escalar porque está tomando suas próprias decisões de limiar a partir de números brutos. Pré-computar `requires_review` usando seus limiares _testados_ move essa decisão calibrada para o código, onde você tem controle. O array `review_reasons` dá ao orquestrador contexto acionável: ele pode comunicar quais campos específicos precisam de verificação humana. A opção A reestrutura, mas não explica o _porquê_. A opção D deixa a interpretação do limiar para o modelo, recriando o problema original. ---",
+  "options": {
+   "A": "Retornar os campos organizados em objetos `verified` e `needs_verification` com base em limiares de confiança.",
+   "B": "Retornar os campos com pontuações de confiança, mais um booleano `requires_review` computado usando seus limiares de confiança testados, junto com um array `review_reasons` explicando quais campos acionaram a revisão.",
+   "C": "Computar uma pontuação agregada `extraction_quality` em todos os campos e retorná-la junto com os valores extraídos.",
+   "D": "Retornar os campos com suas pontuações de confiança brutas e adicionar exemplos few-shot detalhados ao seu system prompt demonstrando como interpretar as faixas de confiança."
+  },
+  "text": "Sua ferramenta de extração de documentos usa modelos de ML para extrair campos de faturas (fornecedor, valor, data). Os modelos retornam pontuações de confiança (0.0-1.0) por campo. Em produção: (1) o agente prossegue com extrações de baixa confiança que estão incorretas 23% das vezes, e (2) o agente solicita revisão humana desnecessária para 31% das extrações que estavam de fato corretas. Como você deve reestruturar a saída da ferramenta?"
+ },
+ "d6717a0db8": {
+  "explanation": "Por que está correto: Anotações de ferramenta como `readOnlyHint` ou `destructiveHint` são inteiramente autodeclaradas pelo servidor MCP. Se o próprio servidor não é verificado ou é de terceiros, seus metadados não podem ser confiáveis como uma fronteira de segurança. Políticas de bypass de confirmação devem ser construídas com base na confiança explícita no fornecedor que disponibiliza o servidor, e não simplesmente acreditando na palavra do servidor por meio de anotações. Por que as outras são mais fracas: - **A)** Execução local não significa que o código/servidor seja confiável. - **C)** O comportamento em sandbox não garante que capacidades maliciosas não estejam ocultas. - **D)** `readOnlyHint` é apenas um rótulo, não uma garantia criptográfica ou de nível de sistema. ** Lição da prova:** Trate as anotações MCP como metadados autodeclarados não confiáveis, a menos que o próprio servidor seja explicitamente confiável pelo seu sistema. ---",
+  "options": {
+   "A": "Confiar nas anotações automaticamente porque o servidor MCP roda localmente.",
+   "B": "Tratar as anotações como metadados não confiáveis e basear sua política de bypass de confirmação na sua confiança no fornecedor/servidor, e não nos rótulos autodeclarados.",
+   "C": "Inferir a confiabilidade do servidor testando primeiro as ferramentas em um sandbox.",
+   "D": "Pular as confirmações do usuário com segurança, já que o `readOnlyHint` garante que nenhuma ação destrutiva pode ocorrer."
+  },
+  "text": "Um servidor terceirizado de Model Context Protocol (MCP) fornece ferramentas anotadas com `readOnlyHint=true`. Você está projetando o fluxo de confirmação do usuário para sua aplicação de agente. Como você deve tratar essas anotações de ferramenta?"
+ },
+ "d845e137fa": {
+  "explanation": "Adicionar `\"other\"` com um campo de detalhe lida com a natureza aberta dos tipos de imóvel, ao mesmo tempo em que preserva a estrutura de enum para os casos comuns. O sistema permanece compatível com os consumidores que dependem do enum, enquanto tipos novos/raros são capturados em `property_type_detail`. Strings de formato livre (A) perdem totalmente a estrutura categórica. Expandir continuamente o enum (C) é uma esteira de manutenção que nunca acaba. O mapeamento few-shot (D) força uma categorização imprecisa — um \"studio\" mapeado para \"apartment\" perde informação relevante. ---",
+  "options": {
+   "A": "Mudar `property_type` de um enum para uma string de formato livre e implementar uma etapa de normalização no pós-processamento.",
+   "B": "Adicionar um valor `\"other\"` ao seu enum, com um campo de string `property_type_detail` separado para as especificidades quando `\"other\"` for selecionado.",
+   "C": "Expandir continuamente o enum para incluir os tipos de imóvel recém-observados e adicionar monitoramento para casos extremos adicionais.",
+   "D": "Adicionar exemplos few-shot ao seu prompt demonstrando como mapear tipos de imóvel inesperados para o valor de enum existente mais próximo."
+  },
+  "text": "Sua extração usa tool use com um JSON schema em que `property_type` é definido como um enum: `['house', 'apartment', 'condo', 'townhouse']`. Após a implantação, 8% das extrações falham na validação de schema. A investigação revela que os anúncios mencionam muitos tipos incomuns — \"studio\", \"loft\", \"duplex\", \"mobile home\" — e novos tipos continuam aparecendo regularmente. Qual é a solução de longo prazo mais eficaz?"
+ },
+ "db672b1ac8": {
+  "explanation": "O problema é uma incompatibilidade entre o contexto da conversa existente (moldado pelo prompt antigo) e o comportamento do novo prompt — equivalente a alterar o `CLAUDE.md` no meio do projeto. A solução mais limpa é o versionamento de prompts: as conversas continuam sob a versão do prompt que as moldou; apenas novas conversas recebem o novo comportamento. A opção C (instruções de consistência) não consegue sobrepor mudanças comportamentais fundamentais no novo prompt. A opção D (regerar resumos) corre o risco de introduzir inconsistências e é cara. ---",
+  "options": {
+   "A": "Adicionar uma mensagem de transição quando as sessões forem retomadas, explicando que o assistente foi atualizado.",
+   "B": "Versionar os system prompts e associar cada conversa à versão do prompt sob a qual ela foi iniciada, aplicando as atualizações apenas a novas conversas.",
+   "C": "Adicionar instruções ao novo system prompt orientando o assistente a manter consistência com quaisquer afirmações anteriores no histórico da conversa.",
+   "D": "Regerar resumos das conversas existentes usando o novo prompt e substituir os históricos armazenados para alinhar o contexto passado ao comportamento atual."
+  },
+  "text": "Após implantar um system prompt atualizado que melhora a qualidade das respostas, usuários com conversas multi-sessão que se estendem por várias semanas relatam que o assistente contradiz suas afirmações anteriores e tem um estilo de comunicação visivelmente diferente. Novos usuários não enfrentam esses problemas. Qual é a melhor abordagem para resolver isso?"
+ },
+ "dc300c4998": {
+  "explanation": "Uma taxa de falha de 3% em uma regra crítica de segurança significa que o modelo está ignorando de forma não determinística as instruções do system prompt. A abordagem que melhor corresponde à conformidade *garantida* aqui é a imposição na camada de infraestrutura via um hook — código que roda independentemente do comportamento do modelo e bloqueia a chamada de ferramenta não conforme antes que ela seja executada. As opções A e B iteram sobre a abordagem que está falhando (prompting). A opção D é melhor que o prompting, mas ainda depende de o modelo escalar após ver o erro; um hook elimina totalmente essa dependência. ---",
+  "options": {
+   "A": "Reforçar o system prompt com linguagem enfática: \"CRITICAL POLICY: Refunds over $500 MUST trigger human escalation. NEVER process these directly.\"",
+   "B": "Adicionar exemplos few-shot ao prompt mostrando o comportamento correto de escalonamento em vários valores de reembolso ($400, $500, $600).",
+   "C": "Implementar um hook para interceptar as chamadas de ferramenta; quando o valor do reembolso exceder $500, bloqueá-la e invocar o escalonamento para humano.",
+   "D": "Modificar a ferramenta de reembolso para retornar um erro com a mensagem \"Amount exceeds policy limit — please escalate\" quando o limite for excedido."
+  },
+  "text": "A conformidade exige que reembolsos superiores a $500 sejam automaticamente escalados para um agente humano — essa regra não pode ficar a critério do modelo. Apesar de instruções enfáticas no system prompt, os logs de produção mostram que o agente ocasionalmente processa reembolsos de alto valor diretamente (taxa de falha de 3%). Como você deve atingir conformidade garantida?"
+ },
+ "dccc54a396": {
+  "explanation": "Uma abordagem híbrida preserva o melhor dos dois mundos: as mensagens recentes permanecem na íntegra (fidelidade total para o contexto ativo) enquanto as mensagens mais antigas são comprimidas em resumos (temas e decisões importantes retidos a um custo menor de tokens). Simplesmente expandir a janela (A) adia o problema sem resolvê-lo. Chamadas de API de resumo separadas (B) adicionam latência e custo por turno. A recuperação por vetores (D) é poderosa, mas pode deixar passar contexto relevante que não corresponde semanticamente à consulta atual. ---",
+  "options": {
+   "A": "Aumentar o tamanho da janela para 50 pares de mensagens, a fim de reter mais histórico da conversa antes do truncamento.",
+   "B": "Adicionar uma chamada de API separada a cada turno para resumir as mensagens que estão sendo descartadas, adicionando esse resumo contínuo ao início da conversa.",
+   "C": "Substituir a janela deslizante por uma abordagem híbrida: resumir as mensagens mais antigas e manter as mensagens recentes na íntegra.",
+   "D": "Implementar busca por similaridade de vetores sobre todo o histórico da conversa, recuperando mensagens passadas relevantes para cada consulta do usuário."
+  },
+  "text": "Usuários relatam que a IA perde o controle de tópicos, exemplos e preferências específicas do início da sessão. Sua implementação atual usa uma janela deslizante que mantém apenas os 25 pares de mensagens mais recentes. Qual é a abordagem mais eficaz para manter a percepção do conteúdo anterior da conversa, ao mesmo tempo em que se gerencia o tamanho do contexto?"
+ },
+ "de8da76eb2": {
+  "explanation": "Por que está correto: Os agentes não devem desperdiçar tokens de contexto e tempo de execução do LLM resolvendo erros transitórios previsíveis em nível de sistema (como timeouts). Esses devem ser tratados via loops de repetição de engenharia padrão dentro da ferramenta. No entanto, erros de sintaxe/validação exigem a capacidade de raciocínio do agente para corrigir a entrada. Retorná-los imediatamente com detalhes explícitos de validação permite que o agente se autocorrija de forma eficiente. Por que as outras são mais fracas: - **A)** Empurrar loops de repetição de rede para o LLM desperdiça turnos de execução caros. - **C)** Repetir erros de sintaxe é um desperdício de computação; um UUID malformado falhará 3 vezes de forma idêntica. - **D)** Mensagens de erro genéricas dão ao LLM zero contexto para autocorrigir falhas de validação. ** Lição do Exame:** Abstraia as repetições de erros transitórios (timeouts) para a lógica de backend da ferramenta, mas retorne os erros de validação/sintaxe imediatamente ao agente com detalhes explícitos para que ele possa se autocorrigir. ---",
+  "options": {
+   "A": "Passar todos os erros ao agente e instruí-lo a repetir os timeouts, mas parar nos erros de sintaxe.",
+   "B": "Repetir automaticamente os timeouts de rede transitórios dentro da ferramenta, mas retornar imediatamente os erros de sintaxe com detalhes claros de validação ao agente.",
+   "C": "Repetir automaticamente todos os erros 3 vezes de forma uniforme antes de retornar uma mensagem de falha ao agente.",
+   "D": "Retornar todos os erros imediatamente ao agente como mensagens genéricas 'Tool Execution Failed'."
+  },
+  "text": "Uma ferramenta sofre dois tipos de erros: timeouts de rede transitórios e erros de sintaxe permanentes do usuário. Como a ferramenta deve lidar com esses erros para otimizar o fluxo de trabalho do agente?"
+ },
+ "df1160e732": {
+  "explanation": "A taxa de aprovação rápida de 98% sinaliza que os usuários estão aprovando _sem ler_, porque a confirmação carece de detalhes acionáveis. A correção é apresentar todas as informações que poderiam dar errado — texto do post, conta, horário, plataforma — para que os usuários tenham algo significativo a verificar. Em um sistema multiagente de pesquisa, isso mapeia diretamente para qualquer ação de publicação irreversível: uma confirmação que mostra apenas \"Pronto para publicar o relatório. Confirmar?\" falha da mesma forma. Os usuários precisam ver o conteúdo completo e o destino antes de confirmar. Períodos de espera (A) adicionam atrito sem adicionar informação. A aprovação automática (D) vai na direção errada para ações públicas irreversíveis. ---",
+  "options": {
+   "A": "Adicionar um período de espera obrigatório antes que a opção de confirmar fique disponível.",
+   "B": "Incluir o texto completo do post, a conta de destino, o horário agendado e a plataforma na requisição de confirmação.",
+   "C": "Exigir que os usuários digitem uma frase de confirmação em vez de clicar em um botão.",
+   "D": "Aprovar automaticamente posts rotineiros e exigir confirmação explícita apenas para padrões incomuns, como postar em novas contas ou para grandes audiências."
+  },
+  "text": "Sua ferramenta `post_content` exige confirmação do usuário antes de publicar. O fluxo de trabalho atual exibe \"Pronto para postar nas mídias sociais. Confirmar?\" e os analytics mostram que os usuários aprovam 98% das requisições em até 2 segundos. Post-mortems revelam incidentes em que posts foram para contas erradas, foram agendados para horários errados ou continham erros — todos confirmados pelos usuários sem que percebessem os erros. Como você deve redesenhar o fluxo de confirmação?"
+ },
+ "e0505f7f0e": {
+  "explanation": "Por que está correto: Se a maior parte do contexto de uma sessão ainda é válida, retomar é eficiente. No entanto, você precisa informar estruturalmente o agente sobre o delta. Ao declarar explicitamente quais arquivos mudaram e direcioná-lo a reanalisar apenas esses alvos, o agente utiliza seu entendimento contextual existente da base de código sem perder tempo reverificando arquivos não modificados. Por que as outras são mais fracas: - **B)** Desnecessariamente cara e lenta, descartando um contexto perfeitamente válido. - **C)** O agente pode alucinar que suas conclusões anteriores de ferramentas ainda são verdadeiras sem verificar, levando a raciocínio desatualizado. - **D)** Descartar os outros 9 arquivos remove o contexto cruzado entre arquivos, crucial para a análise de código. ** Lição do Exame:** Ao retomar sessões após mudanças menores de código/dados, informe explicitamente a sessão retomada sobre as mudanças específicas para uma reanálise direcionada, em vez de forçar uma reexploração completa. ---",
+  "options": {
+   "A": "Retomar a sessão, informar explicitamente ao agente quais 3 arquivos mudaram e instruí-lo a reanalisar apenas esses arquivos no contexto de suas conclusões anteriores.",
+   "B": "Iniciar uma sessão completamente nova e fazer o agente reanalisar todos os 12 arquivos do zero.",
+   "C": "Retomar a sessão, mas não mencionar explicitamente as mudanças, confiando que o agente perceberá os diffs dos arquivos organicamente.",
+   "D": "Criar uma nova sessão contendo apenas os 3 arquivos modificados, descartando o contexto dos outros 9 arquivos."
+  },
+  "text": "Você está usando um agente para analisar uma base de código de 12 arquivos. Após o agente concluir sua revisão inicial, um desenvolvedor modifica 3 dos arquivos. Você quer que o agente atualize suas conclusões de forma eficiente. Qual é a melhor abordagem?"
+ },
+ "e076d9a4e3": {
+  "explanation": "Por que isto está correto: O MCP distingue entre *Tools* (para realizar ações ou consultas específicas) e *Resources* (para expor contexto/dados disponíveis). Expor hierarquias, resumos de issues ou schemas de banco de dados diretamente como Resources permite que o agente \"veja\" de forma holística quais dados existem, de maneira leve, antes de decidir exatamente quais chamadas de ferramenta precisas fazer, eliminando o spam exploratório. Por que as outras são mais fracas: - **A)** Destrói as fronteiras de microsserviços e não resolve o problema das consultas exploratórias. - **B)** Reinventa a roda; Resources são o recurso nativo do MCP para exatamente este problema. - **C)** O roteamento por palavras-chave é frágil e falha quando as perguntas abrangem múltiplos sistemas. ** Conclusão para a prova:** Use MCP Resources para expor catálogos de conteúdo (documentos, schemas, resumos) para que os agentes possam descobrir os dados disponíveis antes de desperdiçar turnos com chamadas de ferramenta exploratórias. ---",
+  "options": {
+   "A": "Consolidar todos os servidores MCP em um único endpoint massivo.",
+   "B": "Adicionar uma nova ferramenta `discover_data` a cada servidor MCP.",
+   "C": "Implementar roteamento baseado em palavras-chave no coordenador para enviar consultas ao servidor correto automaticamente.",
+   "D": "Expor o catálogo de conteúdo de cada servidor MCP como um MCP Resource, permitindo que o agente leia quais dados existem antes de fazer chamadas de ferramenta direcionadas."
+  },
+  "text": "Um agente que interage com múltiplos servidores Model Context Protocol (MCP) desperdiça contexto e tempo significativos realizando chamadas de consulta sequenciais apenas para descobrir quais dados (tíquetes de issues, documentos, schemas) estão disponíveis. Como você pode melhorar a descoberta de dados?"
+ },
+ "e131656c08": {
+  "explanation": "Por que isso está correto: Reenviar documentos bem-sucedidos desperdiça dinheiro (97% do custo). Você deve usar o mapeamento de `custom_id` fornecido pelo arquivo de resultado da Batch API para isolar as 300 falhas. Como o erro é `context_length_exceeded`, os documentos são grandes demais para uma única requisição. Você deve dividir esses documentos específicos em segmentos menores e enviá-los em uma nova requisição de lote. Por que as outras são mais fracas: - **A)** Reprocessar 9.700 documentos já bem-sucedidos é um enorme desperdício de custos de API. - **B)** A API síncrona custa 2x mais que a Batch e não oferece vantagem de latência para documentos que precisam de chunking de qualquer forma. - **D)** Os limites de contexto são restrições fixas do modelo, não configurações que podem ser alternadas. ** Conclusão para a prova:** Use `custom_id` para extrair apenas os documentos que falharam, modifique-os (por exemplo, chunking para limites de contexto) e reenvie apenas as falhas para manter as eficiências de custo da Batch API. ---",
+  "options": {
+   "A": "Reenviar todos os 10.000 documentos com um tamanho de chunk menor.",
+   "B": "Mudar os 300 documentos que falharam para a API síncrona.",
+   "C": "Extrair apenas os 300 documentos que falharam usando seu `custom_id`, dividi-los em chunks e reenviá-los como um novo lote.",
+   "D": "Aumentar globalmente o limite da janela de contexto."
+  },
+  "text": "Após um lote diário de 10.000 documentos concluir o processamento, 300 documentos (3%) falham com erros `context_length_exceeded`. O arquivo de resultado identifica cada falha por seu `custom_id`. Qual é a abordagem mais eficiente em custo para processar essas falhas?"
+ },
+ "e54b0d070b": {
+  "explanation": "Após um intervalo de 4 horas, todos os dados de ferramenta estão desatualizados e o histórico de 32 turnos cria ruído que pode confundir o modelo. Começar do zero — com um resumo estruturado e compacto do _que aconteceu_ e chamadas de ferramenta novas — fornece ao modelo dados atuais e precisos em um contexto limpo. A opção A (remover os resultados de ferramenta mas manter a conversa) ainda deixa 32 turnos de contexto potencialmente enganoso. A opção B é frágil — \"preferir o mais recente\" pode ser mal aplicado quando existem múltiplas chamadas de ferramenta do mesmo tipo. A opção D (chamar novamente todas as ferramentas) é cara e pode ser desnecessária. ---",
+  "options": {
+   "A": "Retomar com o histórico completo, mas filtrar as mensagens `tool_result` anteriores, mantendo apenas os turnos human/assistant para que o agente precise buscar novamente os dados necessários.",
+   "B": "Retomar com o histórico completo e adicionar uma instrução no system prompt dizendo ao agente para sempre preferir os resultados de ferramenta mais recentes quando houver múltiplas chamadas à mesma ferramenta no contexto.",
+   "C": "Iniciar uma nova sessão, injetar um resumo estruturado da interação anterior (tipo de problema, ações tomadas, status de resolução) e então fazer chamadas de ferramenta novas antes de engajar.",
+   "D": "Retomar com o histórico completo e configurar o agente para chamar novamente de forma automática todas as ferramentas usadas anteriormente no início da sessão para garantir a atualização dos dados."
+  },
+  "text": "Um cliente retorna 4 horas após sua sessão inicial sobre a mesma disputa de cobrança. A sessão anterior, de 32 turnos, contém resultados de `lookup_order` mostrando \"Status: PENDING, Expected resolution: 24-48 hours.\" O agente frequentemente referencia esses dados desatualizados em suas respostas, mesmo após chamadas de ferramenta novas subsequentes retornarem informações diferentes. Qual abordagem lida de forma mais confiável com clientes que retornam?"
+ },
+ "e5593e48bd": {
+  "explanation": "Por que isto está correto: schemas JSON evitam erros de sintaxe, mas não erros semânticos (como contas erradas). O padrão de autocorreção mais robusto é extrair tanto o que o documento declara explicitamente (`stated_total`) quanto o que o modelo calcula a partir dos itens de linha (`calculated_total`). Se eles não baterem, o registro é sinalizado para revisão humana. Isso melhora a confiabilidade sem fabricar dados. Por que as outras são mais fracas: - **B)** Ajustar os itens de linha inventa valores não suportados pelo documento, corrompendo a integridade dos dados. - **C)** Adiciona sobrecarga arquitetural desnecessária quando há validação determinística explícita disponível. - **D)** Exemplos few-shot não podem garantir consistência determinística para aritmética. ** Conclusão para a prova:** Projete fluxos de autocorreção extraindo tanto um valor declarado quanto um valor calculado, roteando divergências para revisão humana em vez de \"corrigir\" silenciosamente erros do documento de origem. ---",
+  "options": {
+   "A": "Adicionar um campo `calculated_total` ao lado do campo `stated_total`, compará-los e sinalizar divergências para revisão humana.",
+   "B": "Ajustar automaticamente os valores dos itens de linha para que somem matematicamente o total declarado.",
+   "C": "Introduzir uma etapa secundária de LLM para reconciliar os erros matemáticos.",
+   "D": "Adicionar mais exemplos few-shot de matemática correta ao prompt."
+  },
+  "text": "Um pipeline automatizado de extração de faturas ocasionalmente produz JSON estruturado em que os itens de linha extraídos não somam o valor total extraído da fatura. Qual é a melhor abordagem arquitetural para lidar com esse erro semântico?"
+ },
+ "e79c486b98": {
+  "explanation": "Os três problemas têm origem em critérios de extração subespecificados. Os exemplos few-shot ensinam ao modelo _como_ aplicar as regras por meio da demonstração: mostrando uma frase composta sendo dividida corretamente, uma habilidade implícita sendo excluída e como é uma lista de habilidades de comprimento apropriado. A opção C adiciona restrições rígidas que tratam alguns problemas, mas um teto rígido de 20 pode truncar currículos genuinamente ricos em habilidades. Os exemplos few-shot fornecem uma orientação cheia de nuances que restrições rígidas por si só não conseguem transmitir. A normalização de pós-processamento (A) ajuda mas não evita a inconsistência na raiz. ---",
+  "options": {
+   "A": "Adicionar uma normalização pós-extração que mapeia as habilidades para uma taxonomia canônica e deduplica entradas semelhantes.",
+   "B": "Adicionar exemplos few-shot demonstrando o tratamento de frases compostas, critérios de menção explícita e granularidade de entrada apropriada.",
+   "C": "Adicionar restrições: \"Extract 10-20 skills maximum, one skill per entry, only explicitly named skills.\"",
+   "D": "Enriquecer o schema para `{skill: string, confidence: float, source_quote: string}[]` para capturar metadados de extração."
+  },
+  "text": "Seu schema inclui um campo `skills: string[]`. O monitoramento em produção revela três problemas de consistência: (1) frases compostas como \"Python and SQL\" às vezes são mantidas como uma única entrada, às vezes divididas; (2) habilidades implícitas mas não declaradas ocasionalmente aparecem; (3) documentos semelhantes produzem arrays de comprimentos muito diferentes (5-10 vs 40+ entradas). Seu prompt diz \"Extract all skills mentioned.\" Qual é a melhoria mais eficaz?"
+ },
+ "e813dfc200": {
+  "explanation": "O problema é a inconsistência de _formato_ e omissões ocasionais — o modelo consegue extrair os materiais mas não sabe qual formato usar. Os exemplos few-shot fornecem demonstrações concretas do mapeamento entrada→saída desejado, incluindo a normalização de formato. Temperature=0 (C) reduz a aleatoriedade mas não ensina o formato desejado. Tornar o campo obrigatório (A) evita omissões mas não corrige a inconsistência de formato. Um modelo mais capaz (B) é um palpite caro quando a questão é uma clara lacuna no sinal de treinamento. ---",
+  "options": {
+   "A": "Tornar o campo \"materials\" obrigatório em vez de opcional no schema para forçar o modelo a sempre extrair um valor.",
+   "B": "Mudar para um tier de modelo mais capaz, já que a extração inconsistente indica capacidade insuficiente do modelo.",
+   "C": "Definir a temperature como 0 para eliminar a aleatoriedade e garantir saídas determinísticas.",
+   "D": "Adicionar exemplos few-shot mostrando 2-3 pares completos de entrada-saída com formatos padronizados de descrição de material."
+  },
+  "text": "Seu sistema de extração analisa descrições de produtos de e-commerce para extrair especificações em JSON. Apesar de ter um schema bem definido, o modelo extrai o campo \"materials\" de forma inconsistente — formatos diferentes, omissões ocasionais quando a informação de material está claramente presente. Qual é a melhoria mais eficaz?"
+ },
+ "edd629b9e3": {
+  "explanation": "O problema é que o resumo em texto livre perde valores numéricos específicos. A solução é preservar esses valores em um formato estruturado e consultável — separado do contexto conversacional. Quando perguntas dependentes de precisão chegam, recupere os fatos estruturados relevantes para o contexto. A opção B (reinjetar seções inteiras do artigo) é menos precisa e menos eficiente em tokens. A opção C mantém demais no contexto permanentemente. A opção D ainda depende de uma etapa de resumo que pode perder a precisão numérica. ---",
+  "options": {
+   "A": "Manter um banco de dados estruturado de fatos-chave extraídos de cada artigo (tamanhos de amostra, estatísticas, métodos) e recuperar as entradas relevantes para o contexto quando perguntas dependentes de precisão forem detectadas.",
+   "B": "Implementar recuperação que reinjeta as seções relevantes do artigo quando a pergunta do usuário sugere que detalhes numéricos específicos são necessários.",
+   "C": "Manter permanentemente no contexto o texto original das seções de metodologia e resultados, resumindo apenas as porções de discussão conversacional.",
+   "D": "Usar uma chamada separada do Claude com instruções explícitas para gerar resumos de maior fidelidade que preservem todos os detalhes numéricos."
+  },
+  "text": "Seu assistente de pesquisa ajuda usuários a analisar artigos acadêmicos ao longo de conversas extensas. Após mais de 60K tokens, os usuários fazem perguntas de acompanhamento que exigem detalhes numéricos precisos de artigos discutidos anteriormente — tamanhos de amostra, valores-p exatos, critérios de inclusão. Sua abordagem atual resume as discussões dos artigos após 8 turnos. As respostas são frequentemente evasivas ou imprecisas. Qual é a mudança arquitetural mais eficaz?"
+ },
+ "f1423d751b": {
+  "explanation": "A inconsistência é causada por sinais de erro idênticos para situações qualitativamente diferentes. Metadados estruturados — `errorCategory`, `isRetryable` e uma descrição da causa — fornecem ao modelo a informação de que ele precisa para selecionar a resposta correta de forma determinística: erros transitórios → retry, erros de validação → corrigir ou perguntar ao usuário, erros de permissão → escalar. Uma ferramenta `analyze_error` (B) adiciona uma viagem de ida e volta extra para cada falha. Retries no lado do servidor para todos os erros (C) podem mascarar problemas e adicionam latência desnecessária para falhas não transitórias. ---",
+  "options": {
+   "A": "Aprimorar as respostas de erro com metadados estruturados: incluir `errorCategory` (transient/validation/permission), um booleano `isRetryable` e uma descrição do que causou a falha.",
+   "B": "Criar uma ferramenta MCP `analyze_error` que o agente chama após qualquer falha para determinar a categoria do erro e a ação recomendada.",
+   "C": "Implementar lógica de retry com backoff exponencial no seu servidor MCP para todos os erros, retornando ao agente apenas após as tentativas se esgotarem.",
+   "D": "Adicionar exemplos few-shot ao system prompt demonstrando como interpretar padrões de mensagens de erro e selecionar respostas apropriadas."
+  },
+  "text": "Os logs de produção revelam tratamento de erros inconsistente: quando `lookup_order` falha, o agente às vezes tenta novamente mais de 5 vezes, às vezes escala imediatamente, às vezes pede esclarecimentos aos usuários. Sua ferramenta MCP retorna respostas de erro uniformes: `{\"isError\": true, \"content\": [{\"type\": \"text\", \"text\": \"Operation failed\"}]}`. O agente não consegue distinguir entre os tipos de erro. Qual é a melhoria mais eficaz?"
+ },
+ "f4b33428eb": {
+  "explanation": "O modelo precisa de contexto de erro rico e diferenciado para gerar respostas úteis. \"API indisponível\" (transitório, sugerir repetição), \"ID de rastreamento malformado\" (erro de validação, pedir ao usuário para verificar) e \"remessa não encontrada\" (sem resultado, sugerir busca pelo número do pedido) justificam, cada um, mensagens diferentes para o usuário. Erros genéricos (A) privam o modelo de sinal acionável. Exceções Python não tratadas representam o estado de falha atual. A saída de erro estruturada — incluindo tipo de erro e recuperabilidade — dá ao modelo tudo o que ele precisa para responder de forma útil. ---",
+  "options": {
+   "A": "Retornar uma resposta de erro genérica (`{\"success\": false, \"error\": \"lookup_failed\"}`) para todos os casos de falha para manter um schema consistente.",
+   "B": "Retornar informações de erro estruturadas como saída normal da ferramenta, incluindo o tipo de erro, o status de recuperabilidade e contexto acionável para o usuário.",
+   "C": "Implementar lógica de repetição com backoff exponencial dentro da ferramenta para que erros transitórios sejam tratados automaticamente.",
+   "D": "Criar ferramentas dedicadas de recuperação de erros (`retry_tracking_lookup`, `search_by_order_number`) que o modelo pode invocar depois que a ferramenta primária retorna um indicador de falha."
+  },
+  "text": "Sua ferramenta `track_shipment(tracking_id)` lança uma exceção Python quando ocorrem erros. Os usuários relatam que o agente dá respostas inúteis como \"Estou tendo dificuldades com essa requisição\" em vez de sugerir alternativas. Como você deve lidar com erros nos resultados da ferramenta?"
+ },
+ "fe0e6fd448": {
+  "explanation": "Por que isso está correto: Resumos em prosa inerentemente destroem metadados (URLs, números de página, datas) à medida que condensam o texto em frases legíveis. A correção estrutural é separar o conteúdo dos metadados. Atribua um `citation_id` no nível de descoberta da fonte. O agente de síntese então escreve uma narrativa usando colchetes inline (por exemplo, `[src_001]`), enquanto os metadados completos ficam armazenados com segurança em um array de índice de citações estruturado e separado, passado junto com a narrativa. Por que as outras são mais fracas: - **A)** Reinfla a janela de contexto, causando falhas de \"lost in the middle\". - **C)** O agente de relatórios não tem as fontes originais; ele vai alucinar citações plausíveis. - **D)** Instruções baseadas em prompt são probabilísticas; sob pressão de tokens, os modelos ainda vão descartar metadados na prosa. ** Conclusão para a prova:** Atribua tags `citation_id` no estágio mais inicial, exija que o agente de síntese produza uma narrativa com tags inline e passe um índice estruturado de citações separado para o agente final. ---",
+  "options": {
+   "A": "Pedir ao agente de síntese para reincluir o texto completo da fonte em seu resumo.",
+   "B": "Atribuir um `citation_id` no agente mais inicial e exigir que o agente de síntese produza uma narrativa com tags inline ao lado de um índice estruturado de citações preservado.",
+   "C": "Instruir o agente de relatórios a inferir as fontes originais a partir do conteúdo da afirmação.",
+   "D": "Instruir o agente de síntese a \"preserve sources\" em sua saída em prosa."
+  },
+  "text": "Um agente de síntese recebe descobertas de agentes upstream e passa um resumo consolidado em prosa para um agente de geração de relatórios. Durante os testes, o gerador de relatórios faz afirmações factuais, mas não consegue atribuí-las com precisão porque os metadados de origem foram perdidos durante a etapa de sumarização. Qual é a abordagem mais eficaz para garantir a atribuição adequada das fontes?"
+ },
+ "fe8eaa1243": {
+  "explanation": "Antes de adicionar mais contexto, pode (prune) o contexto existente para manter apenas o que é necessário para a tarefa atual. Para uma solicitação de devolução, apenas alguns dos mais de 40 campos importam: itens, data de compra, janela de devolução, status. Remover os campos irrelevantes libera um orçamento de contexto significativo para as próximas consultas. A opção B (banco vetorial) é um exagero arquitetural para um problema dentro da própria sessão. A opção C piora o problema. A opção D (resumos em prosa) perde a estrutura necessária para chamadas de ferramenta subsequentes como `process_refund`. ---",
+  "options": {
+   "A": "Extrair apenas os campos relevantes para a devolução (itens, data de compra, janela de devolução, status) de cada resposta de pedido existente, removendo detalhes verbosos.",
+   "B": "Mover todas as respostas de ferramenta para um banco de dados vetorial com indexação semântica, recuperando as partes relevantes conforme a conversa continua.",
+   "C": "Prosseguir com consultas adicionais sem modificar o contexto de saída de ferramenta existente.",
+   "D": "Fazer o modelo gerar um resumo em linguagem natural dos detalhes principais de cada pedido, substituindo as respostas estruturadas por descrições em prosa."
+  },
+  "text": "Seu agente chamou `lookup_order` várias vezes enquanto investigava as solicitações de devolução de um cliente. Cada resposta inclui mais de 40 campos (itens, detalhes de envio, informações de pagamento, histórico de status). As saídas de ferramenta agora representam a maior parte do contexto da conversa. O cliente menciona mais dois pedidos que deseja discutir. Qual é a abordagem mais eficaz antes de fazer consultas adicionais?"
+ },
+ "fe97d60451": {
+  "explanation": "A melhor resposta para a maioria das solicitações ambíguas é fazer uma interpretação razoável, agir com base nela e oferecer-se para ajustar — não interrogar o usuário. \"Vou supor que você precisa de ajuda para redigir o relatório — deixe-me começar com um esboço. Avise-me se você quis dizer outra coisa.\" Isso faz a conversa avançar. A opção A (uma pergunta por turno) ainda gera atraso. A opção B assume silenciosamente, criando surpresas piores quando a suposição está errada. A opção C adiciona complexidade de infraestrutura para um problema melhor resolvido no prompt. --- <a name=\"scenario-4\"></a> ## Cenário 4: Extração de Dados Estruturados **Contexto:** Você está implementando um pipeline de análise de dados de alta confiabilidade que extrai informações estruturadas de documentos não estruturados — cardápios, contratos, listagens de produtos, currículos e avaliações. O pipeline deve produzir JSON válido em conformidade com schemas predefinidos, lidar com dados de origem ambíguos ou conflitantes e rotear extrações incertas para revisão humana — tudo isso gerenciando os custos de API em escala usando a Message Batches API. ---",
+  "options": {
+   "A": "Limitar o assistente a uma pergunta de esclarecimento por turno, acumulando respostas ao longo de múltiplas trocas.",
+   "B": "Criar uma tabela de consulta de padrões comuns de solicitação com interpretações padrão predefinidas, respondendo sem declarar as suposições feitas.",
+   "C": "Adicionar uma etapa de pré-processamento usando um modelo menor para classificar a ambiguidade da solicitação, roteando solicitações de alta ambiguidade para um diálogo de esclarecimento.",
+   "D": "Modificar o system prompt para instruir o assistente a fazer suposições razoáveis a partir do contexto disponível, declarar essas suposições explicitamente e oferecer-se para ajustar caso a interpretação esteja errada."
+  },
+  "text": "Seu assistente conversacional frequentemente gera múltiplas perguntas de esclarecimento quando os usuários fazem solicitações ambíguas. \"Você pode me ajudar com o relatório?\" dispara uma resposta com 3 perguntas. As análises de usuário mostram uma taxa de 40% de abandono de conversa. Qual é a correção mais eficaz?"
+ }
+}
