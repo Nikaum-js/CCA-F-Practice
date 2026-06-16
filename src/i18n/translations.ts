@@ -50,13 +50,14 @@ const pt = {
 
   'domain.meta': '{n} questões · peso {w}%',
 
-  'exam.quick.title': 'Rápido · 15',
+  'exam.quick.title': 'Rápido',
   'exam.quick.sub': 'Amostra ponderada de 15 questões. ~10 min.',
-  'exam.medium.title': 'Médio · 30',
+  'exam.medium.title': 'Médio',
   'exam.medium.sub': 'Amostra ponderada de 30 questões. ~20 min.',
-  'exam.full.title': 'Completo · 60',
+  'exam.full.title': 'Completo',
   'exam.full.sub': 'Simulado completo. Nota 100–1000. ~40 min.',
   'exam.full.badge': 'Simulado real',
+  'exam.unit': 'questões',
 
   'mixed.title': 'Modo Misto',
   'mixed.sub': 'Todas as questões embaralhadas entre domínios',
@@ -165,13 +166,14 @@ const en: Record<TranslationKey, string> = {
 
   'domain.meta': '{n} questions · weight {w}%',
 
-  'exam.quick.title': 'Quick · 15',
+  'exam.quick.title': 'Quick',
   'exam.quick.sub': 'Weighted sample of 15 questions. ~10 min.',
-  'exam.medium.title': 'Medium · 30',
+  'exam.medium.title': 'Medium',
   'exam.medium.sub': 'Weighted sample of 30 questions. ~20 min.',
-  'exam.full.title': 'Full · 60',
+  'exam.full.title': 'Full',
   'exam.full.sub': 'Full simulation. 100–1000 score. ~40 min.',
   'exam.full.badge': 'Real simulation',
+  'exam.unit': 'questions',
 
   'mixed.title': 'Mixed Mode',
   'mixed.sub': 'All questions shuffled across domains',

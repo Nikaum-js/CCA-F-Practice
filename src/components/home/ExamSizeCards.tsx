@@ -33,11 +33,25 @@ export function ExamSizeCards({ onPick }: Props) {
               c.full ? 'border-accent/50 hover:border-accent' : 'hover:border-border',
             )}
           >
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-15 font-semibold tracking-tight">{c.title}</span>
-              {c.full && <Badge>{t('exam.full.badge')}</Badge>}
+            <div className="flex items-start justify-between gap-2">
+              <span
+                className={cn(
+                  'font-display text-4xl font-semibold leading-none tabular-nums',
+                  c.full && 'text-accent',
+                )}
+              >
+                {c.size}
+              </span>
+              {c.full ? (
+                <Badge>{t('exam.full.badge')}</Badge>
+              ) : (
+                <span className="text-eyebrow uppercase tracking-wider text-muted-foreground">
+                  {t('exam.unit')}
+                </span>
+              )}
             </div>
-            <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{c.sub}</p>
+            <div className="mt-4 text-15 font-semibold tracking-tight">{c.title}</div>
+            <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{c.sub}</p>
           </Card>
         </button>
       ))}
