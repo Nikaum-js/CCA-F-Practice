@@ -1,7 +1,7 @@
 import { Card } from '@/components/ui/card'
 import { DOMAIN_META, DOMAIN_ORDER, type DomainKey, type DomainStats } from '@/data/schema'
 import { useTranslation } from '@/i18n/useTranslation'
-import { rateTextClass } from '@/lib/accuracy'
+import { rateBarClass, rateTextClass } from '@/lib/accuracy'
 import { relativeDate } from '@/lib/time'
 import { cn } from '@/lib/utils'
 
@@ -63,13 +63,25 @@ export function DomainHistoryTable({ stats }: { stats: DomainStats }) {
                 </td>
                 <td className="px-4 py-2.5 text-right tabular-nums">{stats[d].attempted}</td>
                 <td className="px-4 py-2.5 text-right tabular-nums">{stats[d].correct}</td>
-                <td
-                  className={cn(
-                    'px-4 py-2.5 text-right font-semibold tabular-nums',
-                    r != null && rateTextClass(r),
-                  )}
-                >
-                  {r != null ? `${Math.round(r * 100)}%` : '—'}
+                <td className="px-4 py-2.5">
+                  <div className="flex items-center justify-end gap-2.5">
+                    <div className="hidden h-1.5 w-16 overflow-hidden rounded-full bg-muted sm:block">
+                      {r != null && (
+                        <div
+                          className={cn('h-full rounded-full', rateBarClass(r))}
+                          style={{ width: `${Math.round(r * 100)}%` }}
+                        />
+                      )}
+                    </div>
+                    <span
+                      className={cn(
+                        'w-9 text-right font-semibold tabular-nums',
+                        r != null && rateTextClass(r),
+                      )}
+                    >
+                      {r != null ? `${Math.round(r * 100)}%` : '—'}
+                    </span>
+                  </div>
                 </td>
                 <td className="px-4 py-2.5 text-right text-muted-foreground">
                   {relativeDate(stats[d].lastPracticed, lang)}

@@ -22,16 +22,16 @@ export function MixedModeCard({ onStart }: Props) {
         <p className="mt-1 text-sm text-muted-foreground">{t('mixed.sub')}</p>
       </div>
       <div className="flex items-center gap-3">
-        <div className="inline-flex rounded-md border border-border p-0.5">
+        <div className="inline-flex rounded-full border border-border bg-card/50 p-0.5">
           {COUNTS.map((c) => (
             <button
               key={c}
               type="button"
               onClick={() => setCount(c)}
               className={cn(
-                'rounded px-3 py-1 text-sm tabular-nums outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring',
+                'rounded-full px-3.5 py-1 text-sm tabular-nums outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring',
                 count === c
-                  ? 'bg-accent font-semibold text-accent-foreground'
+                  ? 'bg-accent font-semibold text-accent-foreground shadow-card'
                   : 'font-medium text-muted-foreground hover:text-foreground',
               )}
             >
