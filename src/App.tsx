@@ -101,12 +101,10 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <div className="mx-auto max-w-4xl px-4">
-        <AppHeader
-          active={view === 'dictionary' ? 'dictionary' : 'home'}
-          onNavigate={(target) => (target === 'dictionary' ? setView('dictionary') : goHome())}
-        />
-      </div>
+      <AppHeader
+        active={view === 'dictionary' ? 'dictionary' : 'home'}
+        onNavigate={(target) => (target === 'dictionary' ? setView('dictionary') : goHome())}
+      />
 
       {view === 'dictionary' && <DictionaryScreen />}
 
