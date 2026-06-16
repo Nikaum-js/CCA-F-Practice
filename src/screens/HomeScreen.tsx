@@ -48,7 +48,7 @@ export function HomeScreen({
   const { t } = useTranslation()
 
   return (
-    <main className="mx-auto max-w-4xl space-y-12 px-4 pb-16">
+    <main className="mx-auto max-w-4xl space-y-12 px-4 pb-16 pt-8">
       {savedSession && <ResumeSessionBanner onResume={onResume} onDiscard={onDiscardSaved} />}
 
       <StatsBar examHistory={examHistory} bankSize={bankSize} />

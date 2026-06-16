@@ -47,7 +47,7 @@ export function DictionaryScreen() {
   }, [query, category])
 
   return (
-    <main className="mx-auto max-w-4xl space-y-6 px-4 pb-16">
+    <main className="mx-auto max-w-4xl space-y-6 px-4 pb-16 pt-8">
       <div>
         <h1 className="font-display text-2xl font-semibold tracking-tight text-foreground">
           {t('dict.title')}
